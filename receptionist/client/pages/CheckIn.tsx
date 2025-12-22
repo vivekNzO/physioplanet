@@ -6,8 +6,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import { Loader } from 'lucide-react';
 import Navbar from '@/components/NavBar';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CheckIn() {
+  const { tenantId } = useAuth();
   const [mobileNumber, setMobileNumber] = useState('');
   const [suggestions, setSuggestions] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -15,85 +17,52 @@ export default function CheckIn() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Debounce phone input
-  const normalizedPhone = useMemo(() => mobileNumber.replace(/\D/g, ''), [mobileNumber]);
-
-  useEffect(() => {
-    if (!normalizedPhone || normalizedPhone.length < 5) {
-      setSuggestions([]);
-      setError(null);
+  const handleContinue = async () => {
+    if (mobileNumber.length !== 10) return;
+    if (!tenantId) {
+      setError('No tenant selected. Please login again.');
       return;
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await axiosInstance.get('/customers', {
-          params: { phone: normalizedPhone, limit: 5 },
-          signal: controller.signal,
-        });
-        const data = res?.data?.data ?? [];
-        const mapped = data.map((c: any) => ({
-          id: c.id,
-          name: [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown',
-          phone: c.phone || normalizedPhone,
-        }));
-        setSuggestions(mapped);
-      } catch (err: any) {
-        if (controller.signal.aborted) return;
-        setError(err?.response?.data?.error || 'Network error');
-        setSuggestions([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    try {
+      setLoading(true);
+      setError(null);
 
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [normalizedPhone]);
+      // Check if customer exists
+      const res = await axiosInstance.get('/customers', {
+        params: { phone: mobileNumber, limit: 1 },
+      });
 
-  const handleContinue = () => {
-    if (normalizedPhone.length === 10) {
-      const match = suggestions.find(
-        (s) => (s.phone || '').replace(/\D/g, '') === normalizedPhone
-      );
-      
-      if (match) {
-        // Customer exists - after OTP verification, go to appointment-check
+      const data = res?.data?.data ?? [];
+      const customerExists = data.length > 0;
+
+      if (customerExists) {
+        const customer = data[0];
+        const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(' ') || 'Unknown';
+        
+        // Customer exists
         navigate('/book-appointment', {
           state: {
-            mobileNumber: match.phone,
+            mobileNumber: customer.phone || mobileNumber,
             customerExists: true,
-            fullName: match.name,
-            customerId: match.id,
+            fullName: fullName,
+            customerId: customer.id,
           },
         });
       } else {
-        // New customer - after OTP verification, go to new-customer-registration
+        // New customer
         navigate('/new-customer-registration', {
           state: {
-            mobileNumber: normalizedPhone,
+            mobileNumber: mobileNumber,
             customerExists: false,
           },
         });
       }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to check customer. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleSelectCustomer = (s: { id: string; name: string; phone: string }) => {
-    // Send OTP for existing customer
-    navigate('/book-appointment', {
-      state: {
-        mobileNumber: s.phone,
-        customerExists: true,
-        fullName: s.name,
-        customerId: s.id,
-      },
-    });
   };
 
   return (
@@ -266,51 +235,8 @@ export default function CheckIn() {
                     outline: 'none',
                   }}
                 />
-                {loading && (
-                  <div className='w-full flex justify-center items-center'>
-                    <Loader className='animate-spin' size={16} />
-                  </div>
-                )}
                 {error && (
                   <div className='text-sm text-red-600'>{error}</div>
-                )}
-                {!loading && !error && suggestions.length > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 4px)',
-                      left: 0,
-                      width: '100%',
-                      maxHeight: '220px',
-                      overflowY: 'auto',
-                      border: '1px solid #E9EAEB',
-                      borderRadius: '6px',
-                      background: '#FFF',
-                      boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
-                      zIndex: 10,
-                    }}
-                  >
-                    {suggestions.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => handleSelectCustomer(s)}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '12px 14px',
-                          border: 'none',
-                          background: 'transparent',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '2px',
-                        }}
-                      >
-                        <span style={{ fontWeight: 600, color: '#0D0D0D' }}>{s.name}</span>
-                        <span style={{ fontSize: '12px', color: '#555' }}>{s.phone}</span>
-                      </button>
-                    ))}
-                  </div>
                 )}
               </div>
 
@@ -341,7 +267,7 @@ export default function CheckIn() {
               {/* Continue Button */}
               <button
                 onClick={handleContinue}
-                disabled={mobileNumber.length !== 10}
+                disabled={mobileNumber.length !== 10 || loading}
                 style={{
                   width: '100%',
                   height: '51px',
@@ -358,6 +284,12 @@ export default function CheckIn() {
                   cursor: mobileNumber.length === 10 ? 'pointer' : 'not-allowed',
                   transition: 'all 0.3s ease',
                 }}>
+                {loading ? (
+                  <span className='flex items-center justify-center'><Loader className='animate-spin'/></span>
+                )
+                :
+                (
+                  <>
                 <span style={{
                   color: '#FFF',
                   textAlign: 'center',
@@ -378,6 +310,9 @@ export default function CheckIn() {
                     </clipPath>
                   </defs>
                 </svg>
+                </>
+              )
+              }
               </button>
             </div>
           </div>

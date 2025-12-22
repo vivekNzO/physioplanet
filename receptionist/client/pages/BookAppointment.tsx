@@ -2,18 +2,9 @@
 
 import React, { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
+import toast from 'react-hot-toast'
 import { useDebounce } from "@/hooks/use-debounce"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -27,16 +18,13 @@ import StaffSelect from "@/components/StaffSelect"
 import { Card, CardContent } from "@/components/ui/card"
 import Navbar from "@/components/NavBar"
 import BookAppointmentSkeleton from "@/skeletons/BookAppointmentSkeleton"
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
 
 interface Staff {
   id: string
   displayName: string
   title: string | null
-}
-
-interface Service {
-  id: string
-  name: string
 }
 
 interface Customer {
@@ -80,11 +68,9 @@ const STATUS_COLORS: Record<AppointmentStatus, string> = {
 }
 
 function AppointmentsPageContent() {
-  const { toast } = useToast()
-  const [tenantId, setTenantId] = useState<string | null>("cmiwu5n8l005i42zxh8lrhfd5") // TODO: fetch actual tenant ID
+  const { tenantId } = useAuth()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [staffList, setStaffList] = useState<Staff[]>([])
-  const [serviceList, setServiceList] = useState<Service[]>([])
   const [customerList, setCustomerList] = useState<Customer[]>([])
   const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,18 +84,11 @@ function AppointmentsPageContent() {
   const [selectedStatus, setSelectedStatus] = useState<string>("")
   const [startDate, setStartDate] = useState<string>("")
   const [endDate, setEndDate] = useState<string>("")
-
-  // Dialogs
-  const [bookDialogOpen, setBookDialogOpen] = useState(false)
-  const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false)
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
-  const [appointmentToCancel, setAppointmentToCancel] = useState<Appointment | null>(null)
+  const navigate = useNavigate()
 
   // Form state
   const [formData, setFormData] = useState({
     staffId: "",
-    serviceId: "",
     customerId: "",
     isNewCustomer: false,
     newCustomer: {
@@ -133,6 +112,99 @@ function AppointmentsPageContent() {
   // skip the next lookup when a suggestion is selected programmatically
   const skipNextLookup = React.useRef(false)
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
+
+  const location = useLocation()
+
+  // If navigated here with state (e.g., CheckIn -> BookAppointment), prefill customer data
+  useEffect(() => {
+    // Also support ?customerId= in URL
+    try {
+      const params = new URLSearchParams(location.search)
+      const qCid = params.get('customerId')
+      if (qCid) {
+        ;(async () => {
+          try {
+            setCustomerLookupLoading(true)
+            const { data: customerRes } = await axiosInstance.get(`/customers/${qCid}`)
+            const customer = customerRes?.data || customerRes
+            if (customer) {
+              setFormData(prev => ({
+                ...prev,
+                customerId: customer.id,
+                isNewCustomer: false,
+                newCustomer: {
+                  firstName: customer.firstName || "",
+                  lastName: customer.lastName || "",
+                  email: customer.email || "",
+                  phone: customer.phone || prev.newCustomer.phone,
+                  dateOfBirth: customer.dateOfBirth || "",
+                }
+              }))
+              setShowCustomerFields(true)
+            }
+          } catch (err) {
+            console.error('Failed to fetch customer from query param', err)
+          } finally {
+            setCustomerLookupLoading(false)
+          }
+        })()
+      }
+    } catch (err) {
+      // ignore
+    }
+    const st = (location && (location.state as any)) || {}
+    if (!st) return
+
+    // If a customerId is passed, fetch full customer details and prefill
+    if (st.customerId) {
+      ;(async () => {
+        try {
+          setCustomerLookupLoading(true)
+          const { data: customerRes } = await axiosInstance.get(`/customers/${st.customerId}`)
+          const customer = customerRes?.data || customerRes
+          if (customer) {
+            setFormData(prev => ({
+              ...prev,
+              customerId: customer.id,
+              isNewCustomer: false,
+              newCustomer: {
+                firstName: customer.firstName || "",
+                lastName: customer.lastName || "",
+                email: customer.email || "",
+                phone: customer.phone || prev.newCustomer.phone || st.mobileNumber || "",
+                dateOfBirth: customer.dateOfBirth || "",
+              }
+            }))
+            setShowCustomerFields(true)
+          }
+        } catch (err) {
+          console.error('Failed to fetch customer from location state', err)
+        } finally {
+          setCustomerLookupLoading(false)
+        }
+      })()
+      return
+    }
+
+    // If we have a mobileNumber/fullName passed (but no customerId), prefill phone and name for new customer
+    if (st.mobileNumber || st.fullName) {
+      const nameParts = (st.fullName || "").split(" ")
+      const first = nameParts.shift() || ""
+      const last = nameParts.join(" ") || ""
+      setFormData(prev => ({
+        ...prev,
+        isNewCustomer: !st.customerExists,
+        customerId: st.customerExists ? (st.customerId || "") : "",
+        newCustomer: {
+          ...prev.newCustomer,
+          phone: st.mobileNumber || prev.newCustomer.phone,
+          firstName: first,
+          lastName: last,
+        }
+      }))
+      setShowCustomerFields(true)
+    }
+  }, [location.state])
 
   useEffect(() => {
     const raw = debouncedPhone || ""
@@ -272,7 +344,6 @@ function AppointmentsPageContent() {
 
   useEffect(() => {
       fetchStaff()
-      fetchServices()
       fetchCustomers()
       fetchAppointments()
   }, [])
@@ -318,15 +389,6 @@ function AppointmentsPageContent() {
     }
   }
 
-  const fetchServices = async () => {
-    try {
-      const { data } = await axiosInstance.get("/services", { params: { isActive: true, limit: 1000 } })
-      setServiceList(data?.data || [])
-    } catch (error) {
-      console.error("Failed to fetch services:", error)
-    }
-  }
-
   const fetchCustomers = async () => {
     try { 
       const { data } = await axiosInstance.get("/customers", { params: { limit: 1000 } })
@@ -351,11 +413,7 @@ function AppointmentsPageContent() {
       setAppointments(data?.data || [])
     } catch (error) {
       console.error("Failed to fetch appointments:", error)
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      })
+      toast.error("An unexpected error occurred")
     } finally {
       setLoadingAppointments(false)
       setLoading(false)
@@ -365,37 +423,24 @@ function AppointmentsPageContent() {
   const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.staffId || !formData.serviceId || !formData.startAt || !formData.endAt) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
+    if (!formData.staffId || !formData.startAt || !formData.endAt) {
+      toast.error("Please fill in all required fields")
       return
     }
 
     if (!formData.isNewCustomer && !formData.customerId) {
-      toast({
-        title: "Error",
-        description: "Please select a customer or create a new one",
-        variant: "destructive",
-      })
+      toast.error("Please select a customer or create a new one")
       return
     }
 
     if (formData.isNewCustomer && (!formData.newCustomer.firstName || !formData.newCustomer.lastName)) {
-      toast({
-        title: "Error",
-        description: "Please enter customer first and last name",
-        variant: "destructive",
-      })
+      toast.error("Please enter customer first and last name")
       return
     }
 
     try {
       const payload: any = {
         staffId: formData.staffId,
-        serviceId: formData.serviceId,
         startAt: new Date(formData.startAt).toISOString(),
         endAt: new Date(formData.endAt).toISOString(),
         price: parseFloat(formData.price) || 0,
@@ -422,35 +467,25 @@ function AppointmentsPageContent() {
       const response = await axiosInstance.post("/appointments", payload)
 
       if (!response?.data?.success) {
-        toast({
-          title: "Error",
-          description: response?.data?.error || "Failed to book appointment",
-          variant: "destructive",
-        })
+        toast.error(response?.data?.error || "Failed to book appointment")
         return
       }
 
-      toast({
-        title: "Success",
-        description: "Appointment booked successfully",
-      })
+      toast.success("Appointment booked successfully")
 
-      setBookDialogOpen(false)
-      fetchAppointments()
-      if (formData.isNewCustomer) {
-        fetchCustomers()
-      }
+      // dialog removed - no modal to close
+       fetchAppointments()
+       if (formData.isNewCustomer) {
+         fetchCustomers()
+       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      })
+      toast.error("An unexpected error occurred")
     }
   }
 
   const handleSelectSlot = (slot: Slot) => {
     try {
+      console.log('slot selected', slot)
       setSelectedSlot(slot)
 
       const safeStart = slot?.startIso ? String(slot.startIso).slice(0, 16) : ""
@@ -474,69 +509,98 @@ function AppointmentsPageContent() {
         startAt: safeStart,
         endAt: safeEnd,
       }))
-      setBookDialogOpen(true)
+      // do NOT auto-open the dialog; user will click Continue to proceed
+      // setBookDialogOpen(true)
     } catch (err) {
       console.error('Error in handleSelectSlot:', err)
-      setBookDialogOpen(true)
+      // setBookDialogOpen(true)
+      // keep selection even on error
     }
   }
 
-  // Reset form to initial empty state
-  const resetForm = () => {
-    setFormData({
-      staffId: "",
-      serviceId: "",
-      customerId: "",
-      isNewCustomer: false,
-      newCustomer: {
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        dateOfBirth: "",
-      },
-      startAt: "",
-      endAt: "",
-      price: "",
-      notes: "",
-      customerNotes: "",
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleContinue = async () => {
+    console.log('handleContinue invoked', { selectedSlot, formData })
+    if (isSubmitting) return
+
+    if (!selectedSlot) {
+      toast.error("Please select a time slot before continuing")
+      return
+    }
+    const staffForSlot = formData.staffId || (selectedSlot.staffIds && selectedSlot.staffIds[0]) || ""
+
+    console.log('Customer data:', {
+      customerId: formData.customerId,
+      isNewCustomer: formData.isNewCustomer,
+      customerData: formData.newCustomer
     })
-    setSelectedSlot(null)
-    setCustomerSuggestions([])
-    setShowCustomerFields(false)
-  }
 
-  // Clear transient form data when the booking dialog is closed
-  useEffect(() => {
-    if (!bookDialogOpen) {
-      resetForm()
+    // Resolve customer: use selected customerId if present; otherwise create customer from form data
+    const payload: any = {
+      staffId: staffForSlot,
+      serviceId: null,
+      startAt: new Date(selectedSlot.startIso).toISOString(),
+      endAt: new Date(selectedSlot.endIso).toISOString(),
+      price: parseFloat(formData.price) || 0,
+      currency: "USD",
+      status: "CONFIRMED",
+      notes: formData.notes || null,
+      customerNotes: formData.customerNotes || null,
     }
-  }, [bookDialogOpen])
 
-  if (loading) {
-    return (
-      <BookAppointmentSkeleton/>
-    )
-  }
+    if (!formData.customerId) {
+      console.log('Creating new customer')
+      // Create new customer with provided data or default to walk-in
+      const hasCustomerData = formData.newCustomer.firstName || formData.newCustomer.lastName || formData.newCustomer.phone
+      
+      if (hasCustomerData) {
+        // Use the customer data from the form
+        payload.customer = {
+          firstName: formData.newCustomer.firstName || "Walk-in",
+          lastName: formData.newCustomer.lastName || "Guest",
+          email: formData.newCustomer.email || null,
+          phone: formData.newCustomer.phone || null,
+          dateOfBirth: formData.newCustomer.dateOfBirth ? new Date(formData.newCustomer.dateOfBirth).toISOString() : null,
+        }
+      } else {
+        // No customer data provided, create default walk-in customer
+        payload.customer = {
+          firstName: "Walk-in",
+          lastName: "Guest",
+        }
+      }
+    } else {
+      console.log('Using existing customer ID:', formData.customerId)
+      payload.customerId = formData.customerId
+    }
 
-  if (!tenantId) {
-    return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Appointments</h1>
-          <p className="text-muted-foreground">
-            Manage appointments, bookings, and schedules
-          </p>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">
-              No tenant selected. Please select a tenant first.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    console.log('Final payload:', payload)
+
+    try {
+      setIsSubmitting(true)
+      const response = await axiosInstance.post('/appointments', payload)
+
+      if (!response?.data?.success) {
+        toast.error(response?.data?.error || "Failed to book appointment")
+        return
+      }
+
+      toast.success("Appointment booked successfully")
+      setSelectedSlot(null)
+      
+      // Wait a bit for the database to update before navigating
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      fetchAppointments()
+      if (formData.isNewCustomer) fetchCustomers()
+      navigate('/customer-records')
+    } catch (error) {
+      console.error('Continue booking error', error)
+      toast.error("An unexpected error occurred")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // Determine which staff should be shown in the form's staff dropdown.
@@ -544,23 +608,11 @@ function AppointmentsPageContent() {
     ? staffList.filter(s => selectedSlot!.staffIds!.includes(s.id))
     : staffList
 
-  // Validation for enabling Confirm Booking: require staff, service, start/end AND either
-  // an existing selected customer (customerId) OR a new customer with firstName, lastName, email and phone.
-  const isCustomerValid = (!formData.isNewCustomer && !!formData.customerId) || (
-    formData.isNewCustomer &&
-    formData.newCustomer.firstName.trim() !== "" &&
-    formData.newCustomer.lastName.trim() !== "" &&
-    formData.newCustomer.email.trim() !== "" &&
-    formData.newCustomer.phone.trim() !== ""
-  )
-
-  const canConfirm = !!formData.staffId && !!formData.serviceId && !!formData.startAt && !!formData.endAt && isCustomerValid
-
-
   return (
     <div className="min-h-screen bg-[url('/bg-1.jpg')]  bg-no-repeat bg-[100%_center]">
     <Navbar/>
     <div className=" flex flex-col justify-center items-center mt-[59px] max-w-[978px] py-[40.5px] px-[97px] mx-auto bg-[linear-gradient(to_bottom_right,#FAFAFC,#FAFAFCb3)]">
+      {loading? <BookAppointmentSkeleton/>:(
       <div className=" max-w-[784px] w-full">
       <h1 className="text-center text-[36px] leading-none mb-4">Book Your <span className="text-[#1D5287] font-bold">Appointment</span></h1>
       <p className="text-center text-sm text-[#0D0D0D] mb-[6px]">Ready to meet with you</p>
@@ -573,153 +625,57 @@ function AppointmentsPageContent() {
           <div className="md:col-span-1 flex flex-col gap-6">
             <Calendar value={date} onChange={d => { setDate(d); setSelectedSlot(null) }} />
           </div>
-          <div className="md:col-span-1 p-4 rounded pt-[18px] pl-[45px] pr-0 pb-0 max-h-[345px] overflow-hidden">
-            <TimeSlots staffId={staffId} date={date} onSelect={handleSelectSlot} />
-          </div>
-          <div className="md:col-span-2">
-              <Dialog open={bookDialogOpen} onOpenChange={setBookDialogOpen}>
-                <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-center text-[32px]">Book Appointment</DialogTitle>
-                    <DialogDescription className="text-center"  >Selected Slot: {selectedSlot ? `${format(new Date(selectedSlot.startIso), 'PPP p')} - ${format(new Date(selectedSlot.endIso), 'PPP p')}` : "None"}</DialogDescription>
-                  </DialogHeader>
-
-                  <form onSubmit={handleBookAppointment} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Staff</Label>
-                        <select
-                          className="mt-1 block w-full rounded border px-3 py-2"
-                          value={formData.staffId}
-                          onChange={(e) => setFormData({ ...formData, staffId: e.target.value })}
-                        >
-                          <option value="">Select staff</option>
-                          {availableStaff.length === 0 ? (
-                            <option value="" disabled>No staff available for this slot</option>
-                          ) : (
-                            availableStaff.map(s => (
-                              <option key={s.id} value={s.id}>{s.displayName}</option>
-                            ))
-                          )}
-                        </select>
-                      </div>
-
-                      <div>
-                        <Label>Service</Label>
-                        <select
-                          className="mt-1 block w-full rounded border px-3 py-2"
-                          value={formData.serviceId}
-                          onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
-                        >
-                          <option value="">Select service</option>
-                          {serviceList.map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                      <div>
-                        <Label>Customer</Label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="relative">
-                            <Input placeholder="Phone" value={formData.newCustomer.phone} onChange={(e) => {
-                              // typing a phone should clear any previously selected customer
-                              skipNextLookup.current = false
-                              setFormData(prev => ({ ...prev, customerId: "", isNewCustomer: true, newCustomer: { ...prev.newCustomer, phone: e.target.value } }))
-                              setCustomerSuggestions([])
-                            }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handlePhoneEnter() } }} />
-                            {customerLookupLoading && (
-                              <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                                <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
-                              </div>
-                            )}
-                            {customerSuggestions.length > 0 && (
-                              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border rounded shadow max-h-48 overflow-auto [&::-webkit-scrollbar]:hidden scrollbar-none">
-                                {customerSuggestions.map(c => (
-                                  <button
-                                    type="button"
-                                    key={c.id}
-                                    className="w-full text-left px-3 py-2 hover:bg-slate-100"
-                                    onClick={() => {
-                                      // mark to skip the next lookup cycle so our selection doesn't re-trigger suggestions
-                                      skipNextLookup.current = true
-                                      setTimeout(() => { skipNextLookup.current = false }, 800)
-
-                                      if (c.id === '__add__') {
-                                        // user chose to add this phone as a new customer
-                                        setFormData(prev => ({
-                                          ...prev,
-                                          customerId: "",
-                                          isNewCustomer: true,
-                                          newCustomer: {
-                                            firstName: "",
-                                            lastName: "",
-                                            email: "",
-                                            phone: c.phone ?? prev.newCustomer.phone,
-                                            dateOfBirth: "",
-                                          },
-                                        }))
-                                      } else {
-                                        // existing customer selected
-                                        setFormData(prev => ({
-                                          ...prev,
-                                          customerId: c.id,
-                                          isNewCustomer: false,
-                                          newCustomer: {
-                                            firstName: c.firstName ?? "",
-                                            lastName: c.lastName ?? "",
-                                            email: c.email ?? "",
-                                            phone: c.phone ?? prev.newCustomer.phone,
-                                            dateOfBirth: (c as any).dateOfBirth ?? prev.newCustomer.dateOfBirth,
-                                          },
-                                        }))
-                                      }
-
-                                      setCustomerSuggestions([])
-                                      setShowCustomerFields(true)
-                                    }}
-                                  >
-                                    <div className="font-medium">{c.firstName} {c.lastName}</div>
-                                    <div className="text-sm text-muted-foreground">{c.id === '__add__' ? "Add: " : ""}{c.phone}</div>
-                                  </button>
-                                ))}
-                                <div className="border-t px-3 py-2 text-sm text-muted-foreground">Select an existing customer or continue typing to create a new one</div>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {showCustomerFields && (
-                            <>
-                              <Input placeholder="Email" value={formData.newCustomer.email} onChange={(e) => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, email: e.target.value } })} />
-                              <Input placeholder="First name" value={formData.newCustomer.firstName} onChange={(e) => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, firstName: e.target.value } })} />
-                              <Input placeholder="Last name" value={formData.newCustomer.lastName} onChange={(e) => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, lastName: e.target.value } })} />
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    <div>
-                      <Label>Notes</Label>
-                      <Textarea
-                        className="resize-none"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      />
-                    </div>
-
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setBookDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={!canConfirm}>Confirm Booking</Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>   
+          <div className="md:col-span-1 p-4 rounded pt-[18px] pl-[45px] pr-0 pb-0 max-h-[345px]">
+            <div className="mt-4">
+              <TimeSlots staffId={staffId} date={date} onSelect={handleSelectSlot} selectedSlotId={selectedSlot?.id} />
             </div>
+            <button
+              onClick={handleContinue}
+              disabled={!selectedSlot || isSubmitting}
+              style={{
+                marginTop: '12px',
+                width: '100%',
+                height: '51px',
+                padding: '14px 116px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '7px',
+                borderRadius: '4px',
+                background: 'linear-gradient(90deg, #75B640 0%, #52813C 100%)',
+                border: 'none',
+                zIndex: 10,
+                cursor: !selectedSlot ? 'not-allowed' : 'pointer',
+                opacity: !selectedSlot ? 0.6 : 1,
+                transition: 'all 0.3s ease',
+              }}>
+
+              <span style={{
+                color: '#FFF',
+                textAlign: 'center',
+                fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                fontSize: '16px',
+                fontWeight: 600,
+                textTransform: 'capitalize',
+              }}>
+                {isSubmitting ? 'Booking...' : 'Continue'}
+              </span>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <g clipPath="url(#clip0_236_183)">
+                  <path d="M0.781372 7.41249C0.834565 7.42112 0.888397 7.4251 0.942258 7.4244L10.1135 7.42441L9.91352 7.51742C9.71804 7.60994 9.54021 7.73586 9.38799 7.88948L6.81614 10.4613C6.47742 10.7847 6.42051 11.3048 6.68127 11.6938C6.98476 12.1082 7.56677 12.1982 7.98126 11.8947C8.01475 11.8702 8.04657 11.8435 8.07648 11.8147L12.7272 7.16396C13.0907 6.80092 13.091 6.21199 12.7279 5.84854C12.7277 5.84831 12.7274 5.84805 12.7272 5.84781L8.07649 1.1971C7.71274 0.83437 7.12382 0.835184 6.76106 1.19893C6.73252 1.22756 6.70586 1.25802 6.68127 1.29011C6.42051 1.67906 6.47742 2.19921 6.81614 2.52255L9.38334 5.09905C9.51981 5.23566 9.67671 5.35021 9.84841 5.43855L10.1275 5.56412L0.993445 5.56412C0.518286 5.54647 0.101408 5.87839 0.0121436 6.34544C-0.070087 6.85251 0.274299 7.33023 0.781372 7.41249Z" fill="white"/>
+                </g>
+                <defs>
+                  <clipPath id="clip0_236_183">
+                    <rect width="13" height="13" fill="white" transform="translate(13 13) rotate(-180)"/>
+                  </clipPath>
+                </defs>
+              </svg>
+            </button>
+          </div>
           </div>
         </div>
       </div>
+      )}
     </div>
     </div>
   )

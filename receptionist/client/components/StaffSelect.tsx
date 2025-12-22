@@ -41,6 +41,13 @@ export default function StaffSelect({ value, onChange }: { value?: string; onCha
         return () => { mounted = false }
     }, [])
 
+    useEffect(() => {
+        if (!loading && staff.length > 0 && !value) {
+            onChange(staff[0].id)
+        }
+    }, [loading, staff, value, onChange])
+
+
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase()
         if (!q) return staff
@@ -62,21 +69,6 @@ export default function StaffSelect({ value, onChange }: { value?: string; onCha
                             <div className="flex-1 text-left">
                                 <SelectValue placeholder="Select staff" />
                             </div>
-                            {value ? (
-                                <button
-                                    type="button"
-                                    aria-label="Clear staff selection"
-                                    onClick={(e) => {
-                                        // prevent the trigger from toggling when clearing
-                                        e.stopPropagation()
-                                        onChange(undefined)
-                                        setQuery("")
-                                    }}
-                                    className="p-1 rounded hover:bg-slate-100"
-                                >
-                                    <X className="h-4 w-4 text-muted-foreground" />
-                                </button>
-                            ) : null}
                         </div>
                     </SelectTrigger>
 

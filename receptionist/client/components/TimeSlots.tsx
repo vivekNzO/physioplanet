@@ -16,196 +16,58 @@ export type Slot = {
 export default function TimeSlots({
   staffId,
   date,
-  onSelect
+  onSelect,
+  selectedSlotId,
 }: {
   staffId?: string
   date: Date
   onSelect: (slot: Slot) => void
+  selectedSlotId?: string
 }) {
   const [slots, setSlots] = useState<Slot[]>([])
   const [loading, setLoading] = useState(false)
+
   const isoDate = format(date, "yyyy-MM-dd")
 
   useEffect(() => {
+    // 🔑 DO NOTHING until staffId exists
+    if (!staffId) return
+
     let mounted = true
     setLoading(true)
-
-    const generateSlotsFromWindow = (startIso: string, endIso: string, slotLen = 30) => {
-      const slots: { startIso: string; endIso: string }[] = []
-      const start = new Date(startIso)
-      const end = new Date(endIso)
-      let cur = new Date(start)
-
-      while (cur.getTime() + slotLen * 60000 <= end.getTime()) {
-        const next = new Date(cur.getTime() + slotLen * 60000)
-        slots.push({ startIso: cur.toISOString(), endIso: next.toISOString() })
-        cur = next
-      }
-      return slots
-    }
+    setSlots([])
 
     const fetchForStaff = async (sId: string) => {
       try {
-        const availRes = await axiosInstance.get(`/staff/${sId}/availability`)
-        const windows = availRes.data?.data || availRes.data || []
+        // Use central availability endpoint which builds slots from staff availability and excludes booked appointments
+        const res = await axiosInstance.get('/appointments/available', { params: { staffId: sId, date: isoDate } })
+        const slotsData = res.data?.slots || res.data || []
 
-        const apptRes = await axiosInstance.get(`/appointments`, {
-          params: {
-            staffId: sId,
-            startDate: isoDate,
-            endDate: isoDate,
-            limit: 1000,
-          }
-        })
-        const appts = apptRes.data?.data || apptRes.data || []
-        const taken = new Set(appts.map(a => a.startAt || a.startIso))
+        // Map into UI slot shape, attach staff meta
+        const staffRes = await axiosInstance.get('/staff', { params: { isActive: true, limit: 1000 } })
+        const staff = (staffRes.data?.data || []).find((s: any) => s.id === sId)
+        const staffName = staff?.displayName || ''
 
-        const slots: any[] = []
-
-        const combineDateAndTime = (dateStr: string, timeStr: string) =>
-          new Date(`${dateStr}T${timeStr}:00`).toISOString()
-
-        for (const w of windows) {
-          try {
-            if (w.type === "RECURRING") {
-              if (new Date(date).getDay() === w.dayOfWeek) {
-                const startIso = combineDateAndTime(isoDate, w.startTime)
-                const endIso = combineDateAndTime(isoDate, w.endTime)
-                const gen = generateSlotsFromWindow(startIso, endIso)
-
-                for (const s of gen) {
-                  slots.push({
-                    id: `${s.startIso}|${s.endIso}`,
-                    startIso: s.startIso,
-                    endIso: s.endIso,
-                    available: !taken.has(s.startIso)
-                  })
-                }
-              }
-            }
-
-            else if (w.type === "EXCEPTION") {
-              const dayStart = new Date(`${isoDate}T00:00:00`)
-              const dayEnd = new Date(`${isoDate}T23:59:59.999`)
-              const startDateObj = new Date(w.startDate)
-              const endDateObj = new Date(w.endDate)
-
-              if (dayEnd >= startDateObj && dayStart <= endDateObj) {
-                let startIso: string
-                let endIso: string
-
-                if (w.startTime && w.endTime) {
-                  startIso = combineDateAndTime(isoDate, w.startTime)
-                  endIso = combineDateAndTime(isoDate, w.endTime)
-                } else {
-                  startIso = (startDateObj > dayStart ? startDateObj : dayStart).toISOString()
-                  endIso = (endDateObj < dayEnd ? endDateObj : dayEnd).toISOString()
-                }
-
-                const gen = generateSlotsFromWindow(startIso, endIso)
-                for (const s of gen) {
-                  slots.push({
-                    id: `${s.startIso}|${s.endIso}`,
-                    startIso: s.startIso,
-                    endIso: s.endIso,
-                    available: !taken.has(s.startIso)
-                  })
-                }
-              }
-            }
-            else if (w.type === "BLOCK") {
-              continue
-            }
-
-            // fallback generic slot generator
-            else {
-              const start = w.startIso || w.startDate
-              const end = w.endIso || w.endDate
-              if (!start || !end) continue
-
-              const gen = generateSlotsFromWindow(start, end)
-              for (const s of gen) {
-                slots.push({
-                  id: `${s.startIso}|${s.endIso}`,
-                  startIso: s.startIso,
-                  endIso: s.endIso,
-                  available: !taken.has(s.startIso)
-                })
-              }
-            }
-          } catch (err) {
-            console.error("Slot processing error", err)
-          }
-        }
-
-        return { staffId: sId, slots }
-      } catch (err) {
-        console.error("Error loading staff availability", err)
-        return { staffId: sId, slots: [] }
+        return (slotsData || []).map((s: any) => ({
+          id: s.id || `${s.startIso}|${s.endIso}`,
+          startIso: s.startIso,
+          endIso: s.endIso,
+          available: !!s.available,
+          staffIds: s.available ? [sId] : [],
+          staffNames: s.available ? [staffName] : [],
+        }))
+      } catch (e) {
+        console.error("Availability error", e)
+        return []
       }
     }
 
     ;(async () => {
       try {
-        if (staffId) {
-          const res = await fetchForStaff(staffId)
-          if (!mounted) return
+        const staffSlots = await fetchForStaff(staffId)
+        if (!mounted) return
 
-          // fetch staff name
-          const infoRes = await axiosInstance.get("/staff", {
-            params: { isActive: true, limit: 1000 }
-          })
-          const list = infoRes.data?.data || []
-          const staff = list.find((s: any) => s.id === staffId)
-          const staffName = staff?.displayName || staff?.name || ""
-
-          const mapped = res.slots.map(s => ({
-            ...s,
-            staffIds: s.available ? [staffId] : [],
-            staffNames: s.available ? [staffName] : []
-          }))
-
-          setSlots(mapped)
-          return
-        }
-
-        const staffRes = await axiosInstance.get("/staff", {
-          params: { isActive: true }
-        })
-        const staffs = staffRes.data?.data || []
-
-        const results = await Promise.all(staffs.map((s: any) => fetchForStaff(s.id)))
-
-        const map = new Map<string, Slot>()
-
-        for (const res of results) {
-          const staff = staffs.find((x: any) => x.id === res.staffId)
-          const name = staff?.displayName || staff?.name || ""
-
-          for (const sl of res.slots) {
-            const key = `${sl.startIso}|${sl.endIso}`
-            const existing = map.get(key) || {
-              id: key,
-              startIso: sl.startIso,
-              endIso: sl.endIso,
-              available: false,
-              staffIds: [],
-              staffNames: [],
-            }
-
-            if (sl.available) {
-              existing.available = true
-              existing.staffIds!.push(res.staffId)
-              existing.staffNames!.push(name)
-            }
-
-            map.set(key, existing)
-          }
-        }
-
-        setSlots([...map.values()].sort((a, b) =>
-          new Date(a.startIso).getTime() - new Date(b.startIso).getTime()
-        ))
+        setSlots(staffSlots)
       } finally {
         if (mounted) setLoading(false)
       }
@@ -214,75 +76,70 @@ export default function TimeSlots({
     return () => {
       mounted = false
     }
-  }, [staffId, isoDate])
+  }, [staffId, isoDate, date])
 
   if (loading) return <TimeSlotSkeleton date={date} />
 
+  // Helper function to check if a slot is in the past
+  const isSlotPast = (slot: Slot): boolean => {
+    const now = new Date()
+    const slotStart = new Date(slot.startIso)
+    
+    // If the slot start time has passed, it's a past slot
+    // We allow the current slot (where now is between start and end)
+    return slotStart < now
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 max-h-[250px] overflow-hidden">
       <h3 className="text-[20px] text-center">
         {(() => {
           const formatted = format(date, "EEE, MMMM dd yyyy")
-          // Split into date part and year
           const parts = formatted.split(" ")
-          const year = parts[parts.length - 1]
-          const dateWithoutYear = parts.slice(0, -1).join(" ")
+          const year = parts.pop()
           return (
             <>
-              {dateWithoutYear} <span className="text-[#1D5287] font-semibold">{year}</span>
+              {parts.join(" ")}{" "}
+              <span className="text-[#1D5287] font-semibold">{year}</span>
             </>
           )
         })()}
       </h3>
 
-      {/* Wrap the grid in a scrollable container so only the first ~8 slots are visible
-          at once (approx. 4 rows x 2 columns). Users can scroll to see additional slots. */}
-      <div
-        className="max-h-80 overflow-auto focus:outline-none no-scrollbar pb-12"
-        tabIndex={0}
-        aria-label="Available time slots"
-        style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
-      >
-        <style>{`.no-scrollbar::-webkit-scrollbar{display:none;} .no-scrollbar{-ms-overflow-style:none; scrollbar-width:none;}`}</style>
+      <div className="max-h-[260px] overflow-auto no-scrollbar pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="grid grid-cols-2 gap-[10px]">
           {slots.map(slot => {
-          const label =
-            `${format(new Date(slot.startIso), "hh:mm")}-${format(
-              new Date(slot.endIso),
-              "hh:mm a"
-            )}`
+            const label = `${format(
+              new Date(slot.startIso),
+              "hh:mm"
+            )}-${format(new Date(slot.endIso), "hh:mm a")}`
 
-          const staffLine =
-            slot.staffNames?.length
-              ? slot.staffNames.slice(0, 2).join(", ") +
-                (slot.staffNames.length > 2
-                  ? ` +${slot.staffNames.length - 2}`
-                  : "")
-              : ""
+            const isPast = isSlotPast(slot)
+            const isDisabled = !slot.available || isPast
 
-          return (
-            <button
-              key={slot.id}
-              disabled={!slot.available}
-              onClick={() => onSelect(slot)}
-              className={`px-[26.5px] py-[10px] rounded text-sm text-center hover:text-white ${
-                slot.available
-                  ? "bg-[#E3F0DA] hover:bg-[#74B446] text-[#344256]"
-                  : "bg-gray-200 text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              <div className="font-medium">{label}</div>
-              {staffLine && (
-                <div className="text-[8px]">
-                  {staffLine}
-                </div>
-              )}
-            </button>
-          )
+            return (
+              <button
+                key={slot.id}
+                disabled={isDisabled}
+                onClick={() => onSelect(slot)}
+                className={`px-[26.5px] py-[10px] rounded text-sm text-center ${
+                  !isDisabled
+                    ? `${slot.id === selectedSlotId ? 'bg-[#74B446] text-white ring-2 ring-[#74B446]/40 whitespace-nowrap' : 'bg-[#E3F0DA] hover:bg-[#74B446] hover:text-white text-[#344256] whitespace-nowrap'}`
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <div className="font-medium whitespace-nowrap">{label}</div>
+                {slot.staffNames?.length ? (
+                  <div className="text-[8px] whitespace-nowrap">
+                    {slot.staffNames.join(", ")}
+                  </div>
+                ) : null}
+              </button>
+            )
           })}
 
           {!loading && slots.length === 0 && (
-            <div className="text-sm text-gray-500 col-span-2 text-center">
+            <div className="col-span-2 text-center text-sm text-gray-500">
               No slots available
             </div>
           )}

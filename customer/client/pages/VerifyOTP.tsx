@@ -47,7 +47,7 @@ export default function VerifyOTP() {
       if (!expectedOtp || otpValue === expectedOtp) {
         if (customerExists) {
           // Customer exists - redirect to appointment-check
-          navigate('/appointment-check', {
+          navigate('/welcome-page', {
             state: {
               fullName,
               mobileNumber,

@@ -16,7 +16,7 @@ export default function AppointmentCheck() {
 
   const handleWalkIn = () => {
     // Navigate to walk-in check-in (mobile entry)
-    navigate('/verification-success', { state: { ...state, type: 'walk-in' } });
+    navigate('/welcome-page', { state: { ...state, type: 'walk-in' } });
   };
 
   return (

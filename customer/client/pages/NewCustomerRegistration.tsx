@@ -41,7 +41,7 @@ export default function NewCustomerRegistration() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      navigate('/appointment-check', {
+      navigate('/welcome-page', {
         state: { fullName, mobileNumber },
       });
     } catch (err: any) {
@@ -70,8 +70,6 @@ export default function NewCustomerRegistration() {
       setProfilePhoto(e.target.files[0]);
     }
   };
-
-  // TODO - save customer to db 
 
   return (
     <div style={{

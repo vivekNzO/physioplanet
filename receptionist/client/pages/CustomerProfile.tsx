@@ -5,6 +5,7 @@ import { ChevronDown, Filter } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import Navbar from '@/components/NavBar'
 import axiosInstance from '@/lib/axios'
+import CustomerProfileSkeleton from '@/skeletons/CustomerProfileSkeleton'
 
 interface CustomerData {
   id: string
@@ -19,13 +20,13 @@ interface CustomerData {
 
 interface Appointment {
   id: string
-  serviceId: string
+  serviceId: string | null
   staffId: string
   startAt: string
   endAt: string
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW'
   price: number
-  service: { id: string; name: string }
+  service: { id: string; name: string } | null
   staff: { id: string; displayName: string }
 }
 
@@ -82,14 +83,7 @@ export default function CustomerProfile() {
   }, [customerId])
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-cyan-100">
-        <Navbar />
-        <div className="pt-20 px-6 flex items-center justify-center">
-          <p className="text-lg text-gray-600">Loading customer profile...</p>
-        </div>
-      </div>
-    )
+    return <CustomerProfileSkeleton />
   }
 
   if (error || !customer) {
@@ -227,7 +221,7 @@ export default function CustomerProfile() {
                     (activeTab === 'future' ? futureAppointments : pastAppointments).map((appt) => (
                       <tr key={appt.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
                         <td className="px-6 py-4 text-sm text-gray-800">{appt.id.slice(0, 8)}</td>
-                        <td className="px-6 py-4 text-sm text-gray-800">{appt.service.name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-800">{appt.service?.name || 'N/A'}</td>
                         <td className="px-6 py-4 text-sm text-gray-800">{appt.staff.displayName}</td>
                         <td className="px-6 py-4 text-sm">
                           <span className={`inline-block px-3 py-1 rounded text-xs font-semibold ${

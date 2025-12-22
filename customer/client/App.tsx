@@ -16,7 +16,6 @@ import WalkInCheckIn from "./pages/WalkInCheckIn";
 import WalkInRegistration from "./pages/WalkInRegistration";
 import PatientDashboard from "./pages/PatientDashboard";
 import AppointmentCustomerDetails from "./pages/AppointmentCustomerDetails";
-import BookAppointment from "./pages/BookAppointment";
 import WhatsAppConfirmation from "./pages/WhatsAppConfirmation";
 import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
@@ -43,7 +42,6 @@ function App() {
           <Route path="/walk-in-registration" element={<WalkInRegistration />} />
           <Route path="/patient-dashboard" element={<PatientDashboard />} />
           <Route path="/appointment-customer-details" element={<AppointmentCustomerDetails />} />
-          <Route path="/book-appointment" element={<BookAppointment />} />
           <Route path="/whatsapp-confirmation" element={<WhatsAppConfirmation />} />
           <Route path="/welcome-page" element={<WelcomePage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
