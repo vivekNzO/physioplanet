@@ -26,6 +26,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import CustomerRecords from "./pages/CustomerRecords";
 import IndexSkeleton from "@/skeletons/IndexSkeleton";
+import ReceptionDashboard from "./pages/ReceptionDashboard";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +48,8 @@ function AppRoutes() {
       <Route path="/verification-success" element={user?<VerificationSuccess />:<Navigate to={"/login"}/>} />
       <Route path="/patient-dashboard" element={<PatientDashboard />} />
       <Route path="/book-appointment" element={user?<BookAppointment />:<Navigate to={"/login"}/>} />
-      <Route path="customer-records" element={user?<CustomerRecords />:<Navigate to={"/login"}/>} />
+      <Route path="/customer-records" element={user?<CustomerRecords />:<Navigate to={"/login"}/>} />
+      <Route path="/reception-dashboard" element={user?<ReceptionDashboard />:<Navigate to={"/login"}/>} />
       <Route path="/whatsapp-confirmation" element={<WhatsAppConfirmation />} />
       <Route path="/welcome-page" element={<WelcomePage />} />
       <Route path="/customer-profile" element={user?<CustomerProfile />:<Navigate to={"/login"}/>} />

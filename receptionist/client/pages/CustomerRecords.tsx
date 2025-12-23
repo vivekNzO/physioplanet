@@ -1,192 +1,348 @@
-"use client"
+"use client";
 
-import React, { useState, useEffect } from "react"
-import { Search, Filter } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import axiosInstance from "@/lib/axios"
-import Navbar from "@/components/NavBar"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useNavigate } from "react-router-dom"
+import React, { useState, useEffect, useRef } from "react";
+import { Search, ChevronDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import axiosInstance from "@/lib/axios";
+import Navbar from "@/components/NavBar";
+import { Skeleton } from "@/components/ui/skeleton";
+import CustomerRecordsSkeleton from "@/skeletons/CustomerRecordsSkeleton";
+import { useNavigate } from "react-router-dom";
+import { getDefaultStatus } from "@/utils/statusHelper";
+import toast from "react-hot-toast";
 
 interface Staff {
-  id: string
-  displayName: string
+  id: string;
+  displayName: string;
 }
 
 interface Service {
-  id: string
-  name: string
+  id: string;
+  name: string;
 }
 
 interface Customer {
-  id: string
-  firstName: string | null
-  lastName: string | null
-  phone: string | null
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
 }
 
 interface Appointment {
-  id: string
-  staffId: string
-  serviceId: string
-  customerId: string
-  startAt: string
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW"
-  price: number
-  currency: string
-  staff: Staff
-  service: Service
-  customer: Customer
-  checkInTime: string | null
+  id: string;
+  staffId: string;
+  serviceId: string;
+  customerId: string;
+  startAt: string;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
+  price: number;
+  currency: string;
+  staff: Staff;
+  service: Service;
+  customer: Customer;
+  checkInTime: string | null;
 }
 
 interface CustomerRecord {
-  ticketNo: string
-  customerName: string
-  customerId: string
-  mobileNo: string
-  checkInTime: string
-  appointmentTime: string | null
-  assignedTherapist: string
-  payment: string
-  status: "In Exercise" | "Waiting" | "Completed"
-  appointmentId: string
+  ticketNo: string;
+  customerName: string;
+  customerId: string;
+  mobileNo: string;
+  checkInTime: string;
+  appointmentTime: string | null;
+  assignedTherapist: string;
+  payment: string;
+  status: "In Exercise" | "Waiting" | "Completed" | "Cancelled";
+  appointmentId: string;
+  startAt: string;
 }
 
 const STATUS_COLORS = {
   "In Exercise": "bg-green-100 text-green-700",
   Waiting: "bg-red-100 text-red-700",
   Completed: "bg-green-200 text-green-800",
-}
+  Cancelled: "bg-gray-200 text-gray-700",
+};
+
+const STATUS_OPTIONS = ["Waiting", "In Exercise", "Completed", "Cancelled"] as const;
+
 function CustomerRecords() {
-  const [records, setRecords] = useState<CustomerRecord[]>([])
-  const [filteredRecords, setFilteredRecords] = useState<CustomerRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState("customer")
-  const [customerCount, setCustomerCount] = useState(0)
-  const [staffCount, setStaffCount] = useState(0)
-  const navigate = useNavigate()
+  const [records, setRecords] = useState<CustomerRecord[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<CustomerRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("customer");
+  const [timeFilter, setTimeFilter] = useState<"today" | "upcoming" | "recent">(
+    "today",
+  );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [customerCount, setCustomerCount] = useState(0);
+  const [staffCount, setStaffCount] = useState(0);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const badgeRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const navigate = useNavigate();
+  const RECORDS_PER_PAGE = 10;
 
   useEffect(() => {
-    fetchAppointments()
-  }, [])
+    fetchAppointments(timeFilter);
+  }, [timeFilter]);
 
   useEffect(() => {
-    filterRecords()
-  }, [searchTerm, records])
+    filterRecords();
+  }, [searchTerm, records, timeFilter]);
 
-  const fetchAppointments = async () => {
-    setLoading(true)
+  // Compute paginated records
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * RECORDS_PER_PAGE,
+    currentPage * RECORDS_PER_PAGE,
+  );
+  const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
+
+  const fetchAppointments = async (filter: "today" | "upcoming" | "recent") => {
+    setLoading(true);
     try {
-      // Fetch today's appointments
-      const today = new Date()
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString()
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString()
+      // Time bounds
+      const now = new Date();
+      const startOfToday = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        0,
+        0,
+        0,
+        0,
+      );
+      const endOfToday = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        23,
+        59,
+        59,
+        999,
+      );
 
-      const { data } = await axiosInstance.get("/appointments", {
-        params: {
-          startDate: startOfDay,
-          endDate: endOfDay,
-          limit: 1000,
-        },
-      })
+      // Build params based on selected filter
+      const params: Record<string, any> = { limit: 1000 };
+      if (filter === "today") {
+        params.startDate = startOfToday.toISOString();
+        params.endDate = endOfToday.toISOString();
+      } else if (filter === "upcoming") {
+        params.startDate = startOfToday.toISOString();
+      } else if (filter === "recent") {
+        params.limit = 500;
+      }
 
-      const appointments: Appointment[] = data?.data || []
+      const { data } = await axiosInstance.get("/appointments", { params });
+
+      const appointments: Appointment[] = data?.data || [];
 
       // Transform appointments to customer records
-      const customerRecords: CustomerRecord[] = appointments.map((apt) => {
-        const customerName = [apt.customer.firstName, apt.customer.lastName]
-          .filter(Boolean)
-          .join(" ") || "N/A"
-        
-        const maskedPhone = apt.customer.phone
-          ? apt.customer.phone.slice(0, 4) + "*****" + apt.customer.phone.slice(-1)
-          : "N/A"
+      const customerRecords: CustomerRecord[] = appointments
+        .map((apt) => {
+          const customerName =
+            [apt.customer.firstName, apt.customer.lastName]
+              .filter(Boolean)
+              .join(" ") || "N/A";
 
-        const appointmentTime = apt.startAt
-          ? new Date(apt.startAt).toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            })
-          : null
+          const maskedPhone = apt.customer.phone
+            ? apt.customer.phone.slice(0, 4) +
+              "*****" +
+              apt.customer.phone.slice(-1)
+            : "N/A";
 
-        const checkInTime = apt.checkInTime
-          ? new Date(apt.checkInTime).toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            })
-          : "..................."
+          const appointmentTime = apt.startAt
+            ? new Date(apt.startAt).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })
+            : null;
 
-        let status: "In Exercise" | "Waiting" | "Completed"
-        if (apt.status === "COMPLETED") {
-          status = "Completed"
-        } else if (apt.checkInTime) {
-          status = "In Exercise"
-        } else {
-          status = "Waiting"
-        }
+          const checkInTime = apt.checkInTime
+            ? new Date(apt.checkInTime).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })
+            : "...................";
 
-        const paymentStatus =
-          apt.price === 0 ? "Full Paid" : `₹${apt.price}K Pending`
+          // Use dynamic status based on time
+          let status = getDefaultStatus(apt.startAt);
+          
+          // If it's cancelled in the backend, respect that
+          if (apt.status === "CANCELLED") {
+            status = "Cancelled";
+          }
 
-        return {
-          ticketNo: apt.id.slice(0, 5).toUpperCase(),
-          customerName,
-          customerId: apt.customer.id || apt.customerId, // Fallback to customerId if customer.id is missing
-          mobileNo: maskedPhone,
-          checkInTime,
-          appointmentTime,
-          assignedTherapist: apt.staff.displayName,
-          payment: paymentStatus,
-          status,
-          appointmentId: apt.id,
-        }
-      }).filter(record => record.customerId) // Filter out records without customerId
+          const paymentStatus =
+            apt.price === 0 ? "Full Paid" : `₹${apt.price}K Pending`;
 
-      setRecords(customerRecords)
-      setFilteredRecords(customerRecords)
-      setCustomerCount(customerRecords.length)
-      
+          return {
+            ticketNo: apt.id.slice(0, 5).toUpperCase(),
+            customerName,
+            customerId: apt.customer.id || apt.customerId,
+            mobileNo: maskedPhone,
+            checkInTime,
+            appointmentTime,
+            assignedTherapist: apt.staff.displayName,
+            payment: paymentStatus,
+            status,
+            appointmentId: apt.id,
+            startAt: apt.startAt,
+          };
+        })
+        .filter((record) => record.customerId);
+
+      // Apply additional client-side shaping per filter
+      let shaped = customerRecords;
+      if (filter === "today") {
+        shaped = customerRecords.filter((r) => {
+          return true;
+        });
+      } else if (filter === "upcoming") {
+        // Already constrained by API params
+      } else if (filter === "recent") {
+        shaped = appointments
+          .slice(0, 100)
+          .map((apt) => {
+            const customerName =
+              [apt.customer.firstName, apt.customer.lastName]
+                .filter(Boolean)
+                .join(" ") || "N/A";
+            const maskedPhone = apt.customer.phone
+              ? apt.customer.phone.slice(0, 4) +
+                "*****" +
+                apt.customer.phone.slice(-1)
+              : "N/A";
+            const appointmentTime = apt.startAt
+              ? new Date(apt.startAt).toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })
+              : null;
+            const checkInTime = apt.checkInTime
+              ? new Date(apt.checkInTime).toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })
+              : "...................";
+            
+            let status = getDefaultStatus(apt.startAt);
+            if (apt.status === "CANCELLED") {
+              status = "Cancelled";
+            }
+            
+            const paymentStatus =
+              apt.price === 0 ? "Full Paid" : `₹${apt.price}K Pending`;
+            return {
+              ticketNo: apt.id.slice(0, 5).toUpperCase(),
+              customerName,
+              customerId: apt.customer.id || apt.customerId,
+              mobileNo: maskedPhone,
+              checkInTime,
+              appointmentTime,
+              assignedTherapist: apt.staff.displayName,
+              payment: paymentStatus,
+              status,
+              appointmentId: apt.id,
+              startAt: apt.startAt,
+            } as CustomerRecord;
+          });
+      }
+
+      setRecords(shaped);
+      setFilteredRecords(shaped);
+      setCurrentPage(1);
+      setCustomerCount(shaped.length);
+
       // Count unique staff
-      const uniqueStaff = new Set(appointments.map(apt => apt.staffId))
-      setStaffCount(uniqueStaff.size)
+      const uniqueStaff = new Set(appointments.map((apt) => apt.staffId));
+      setStaffCount(uniqueStaff.size);
     } catch (error) {
-      console.error("Failed to fetch appointments:", error)
+      console.error("Failed to fetch appointments:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const filterRecords = () => {
     if (!searchTerm.trim()) {
-      setFilteredRecords(records)
-      return
+      setFilteredRecords(records);
+      setCurrentPage(1);
+      return;
     }
 
     const filtered = records.filter((record) =>
       Object.values(record).some((value) =>
-        String(value).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    )
-    setFilteredRecords(filtered)
-  }
+        String(value).toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
+    );
+    setFilteredRecords(filtered);
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = async (
+    appointmentId: string,
+    newStatus: string,
+  ) => {
+    setUpdatingId(appointmentId);
+    try {
+      // Map frontend labels to backend enum values
+      const statusMap: Record<string, string> = {
+        "Waiting": "PENDING",
+        "In Exercise": "CONFIRMED",
+        "Completed": "COMPLETED",
+        "Cancelled": "CANCELLED",
+      };
+      
+      const backendStatus = statusMap[newStatus] || newStatus;
+
+      await axiosInstance.put(`/appointments/${appointmentId}`, {
+        status: backendStatus,
+      });
+
+      // Update local state
+      setRecords((prevRecords) =>
+        prevRecords.map((r) =>
+          r.appointmentId === appointmentId
+            ? { ...r, status: newStatus as any }
+            : r,
+        ),
+      );
+
+      // Re-filter to update filtered records
+      const updated = records.map((r) =>
+        r.appointmentId === appointmentId
+          ? { ...r, status: newStatus as any }
+          : r,
+      );
+      setFilteredRecords(
+        updated.filter((record) =>
+          Object.values(record).some((value) =>
+            String(value).toLowerCase().includes(searchTerm.toLowerCase()),
+          ),
+        ),
+      );
+
+      toast.success(`Status updated to ${newStatus}`);
+      setOpenDropdown(null);
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      toast.error("Failed to update status");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-100">
-        <Navbar />
-        <div className="container mx-auto px-4 py-8">
-          <Skeleton className="h-12 w-64 mb-6" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      </div>
-    )
+    return <CustomerRecordsSkeleton />;
   }
 
   return (
@@ -197,17 +353,23 @@ function CustomerRecords() {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
             <TabsList className="bg-gray-100">
-              <TabsTrigger value="customer" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <TabsTrigger
+                value="customer"
+                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white"
+              >
                 Customer ({customerCount})
               </TabsTrigger>
-              <TabsTrigger value="staffs" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <TabsTrigger
+                value="staffs"
+                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white"
+              >
                 Staffs ({staffCount})
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
-          {/* Search and Filter */}
-          <div className="flex gap-4 mb-6">
+          {/* Search and Time Tabs */}
+          <div className="flex gap-4 mb-6 items-center justify-between">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -218,10 +380,31 @@ function CustomerRecords() {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Advanced Filters
-            </Button>
+            <Tabs
+              value={timeFilter}
+              onValueChange={(v) => setTimeFilter(v as any)}
+            >
+              <TabsList className="bg-gray-100">
+                <TabsTrigger
+                  value="today"
+                  className="data-[state=active]:bg-blue-500 data-[state=active]:text-white"
+                >
+                  Today
+                </TabsTrigger>
+                <TabsTrigger
+                  value="upcoming"
+                  className="data-[state=active]:bg-blue-500 data-[state=active]:text-white"
+                >
+                  Upcoming
+                </TabsTrigger>
+                <TabsTrigger
+                  value="recent"
+                  className="data-[state=active]:bg-blue-500 data-[state=active]:text-white"
+                >
+                  Recent
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
           {/* Customer Records Title */}
@@ -231,65 +414,269 @@ function CustomerRecords() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Ticket No.</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Customer Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Mobile No.</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Check-in Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Appointment Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Assigned Therapist</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRecords.map((record, index) => (
-                  <tr
-                    key={record.appointmentId}
-                    className="border-b border-gray-100 hover:bg-gray-50"
-                  >
-                    <td className="py-3 px-4 text-gray-600">{record.ticketNo}</td>
-                    <td className="py-3 px-4 font-medium text-gray-900">
-                      {record.customerId ? (
-                        <button
-                          onClick={() => navigate(`/customer-profile?id=${record.customerId}`)}
-                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
-                        >
-                          {record.customerName}
-                        </button>
-                      ) : (
-                        <span>{record.customerName}</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">{record.mobileNo}</td>
-                    <td className="py-3 px-4 text-gray-600">{record.checkInTime}</td>
-                    <td className="py-3 px-4 text-green-600 font-medium">
-                      {record.appointmentTime || "..................."}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">{record.assignedTherapist}</td>
-                    <td className="py-3 px-4 text-gray-600">{record.payment}</td>
-                    <td className="py-3 px-4">
-                      <Badge className={STATUS_COLORS[record.status]}>
-                        {record.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {(() => {
+              // Group records by date (YYYY-MM-DD format)
+              const recordsByDate = paginatedRecords.reduce(
+                (acc, record) => {
+                  const date = new Date(record.startAt).toLocaleDateString(
+                    "en-US",
+                    {
+                      weekday: "short",
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    },
+                  );
+                  const dateKey = new Date(record.startAt)
+                    .toISOString()
+                    .split("T")[0];
 
-            {filteredRecords.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                No customer records found
-              </div>
-            )}
+                  if (!acc[dateKey]) {
+                    acc[dateKey] = { displayDate: date, records: [] };
+                  }
+                  acc[dateKey].records.push(record);
+                  return acc;
+                },
+                {} as Record<
+                  string,
+                  { displayDate: string; records: typeof filteredRecords }
+                >,
+              );
+
+              // Sort dates in reverse (newest first)
+              const sortedDateKeys = Object.keys(recordsByDate).sort(
+                (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+              );
+
+              return (
+                <>
+                  {sortedDateKeys.length > 0 ? (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Ticket No.
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Customer Name
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Mobile No.
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Check-in Time
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Appointment Time
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Assigned Therapist
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Payment
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedDateKeys.map((dateKey) => (
+                          <React.Fragment key={dateKey}>
+                            {/* Date Divider Row */}
+                            <tr className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b-2 border-blue-200">
+                              <td
+                                colSpan={8}
+                                className="py-3 px-4 font-semibold text-gray-800 text-sm border-l-4 border-blue-500"
+                              >
+                                {recordsByDate[dateKey].displayDate}
+                              </td>
+                            </tr>
+                            {/* Records for this date */}
+                            {recordsByDate[dateKey].records.map((record) => (
+                              <tr
+                                key={record.appointmentId}
+                                className="border-b border-gray-100 hover:bg-gray-50"
+                              >
+                                <td className="py-3 px-4 text-gray-600">
+                                  {record.ticketNo}
+                                </td>
+                                <td className="py-3 px-4 font-medium text-gray-900">
+                                  {record.customerId ? (
+                                    <button
+                                      onClick={() =>
+                                        navigate(
+                                          `/customer-profile?id=${record.customerId}`,
+                                        )
+                                      }
+                                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                                    >
+                                      {record.customerName}
+                                    </button>
+                                  ) : (
+                                    <span>{record.customerName}</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">
+                                  {record.mobileNo}
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">
+                                  {record.checkInTime}
+                                </td>
+                                <td className="py-3 px-4 text-green-600 font-medium">
+                                  {record.appointmentTime ||
+                                    "..................."}
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">
+                                  {record.assignedTherapist}
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">
+                                  {record.payment}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="relative inline-block">
+                                    <button
+                                      ref={(el) => {
+                                        if (el) badgeRefs.current[record.appointmentId] = el;
+                                      }}
+                                      onClick={() => {
+                                        if (openDropdown === record.appointmentId) {
+                                          setOpenDropdown(null);
+                                        } else {
+                                          setOpenDropdown(record.appointmentId);
+                                          setTimeout(() => {
+                                            const btn = badgeRefs.current[record.appointmentId];
+                                            if (btn) {
+                                              const rect = btn.getBoundingClientRect();
+                                              const dropdownHeight = 180; // Approximate height for 4 options
+                                              const spaceBelow = window.innerHeight - rect.bottom;
+                                              
+                                              if (spaceBelow < dropdownHeight) {
+                                                setDropdownPos({
+                                                  top: rect.top - dropdownHeight,
+                                                  left: rect.left,
+                                                });
+                                              } else {
+                                                setDropdownPos({
+                                                  top: rect.bottom + 4,
+                                                  left: rect.left,
+                                                });
+                                              }
+                                            }
+                                          }, 0);
+                                        }
+                                      }}
+                                      className="flex items-center gap-1"
+                                      disabled={updatingId === record.appointmentId}
+                                    >
+                                      <Badge
+                                        className={`${
+                                          STATUS_COLORS[record.status]
+                                        } cursor-pointer flex items-center gap-1`}
+                                      >
+                                        {record.status}
+                                        <ChevronDown className="h-3 w-3" />
+                                      </Badge>
+                                    </button>
+
+                                    {/* Dropdown Menu - Fixed positioned to avoid scrollbar */}
+                                    {openDropdown === record.appointmentId && dropdownPos && (
+                                      <div 
+                                        className="fixed bg-white border border-gray-200 rounded shadow-lg z-50 min-w-32"
+                                        style={{
+                                          top: `${dropdownPos.top}px`,
+                                          left: `${dropdownPos.left}px`,
+                                        }}
+                                      >
+                                        {STATUS_OPTIONS.map((status) => (
+                                          <button
+                                            key={status}
+                                            onClick={() =>
+                                              handleStatusChange(
+                                                record.appointmentId,
+                                                status,
+                                              )
+                                            }
+                                            disabled={
+                                              updatingId === record.appointmentId
+                                            }
+                                            className={`block w-full text-left px-4 py-2 hover:bg-gray-100 first:rounded-t last:rounded-b ${
+                                              record.status === status
+                                                ? "bg-blue-50 font-semibold text-blue-600"
+                                                : ""
+                                            } disabled:opacity-50`}
+                                          >
+                                            {status}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No customer records found
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 px-2">
+              <div className="text-sm text-gray-600">
+                Showing{" "}
+                <span className="font-semibold">
+                  {(currentPage - 1) * RECORDS_PER_PAGE + 1}
+                </span>{" "}
+                to{" "}
+                <span className="font-semibold">
+                  {Math.min(
+                    currentPage * RECORDS_PER_PAGE,
+                    filteredRecords.length,
+                  )}
+                </span>{" "}
+                of{" "}
+                <span className="font-semibold">{filteredRecords.length}</span>{" "}
+                records
+              </div>
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() =>
+                    setCurrentPage(Math.max(1, currentPage - 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:text-gray-600 disabled:cursor-not-allowed hover:bg-blue-600"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:text-gray-600 disabled:cursor-not-allowed hover:bg-blue-600"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default CustomerRecords
+export default CustomerRecords;

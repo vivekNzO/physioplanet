@@ -25,7 +25,19 @@ export default function NewCustomerRegistration() {
   }, [fullName]);
 
   const handleContinue = async () => {
-    if (!fullName) return;
+    // Validation
+    if (!fullName.trim()) {
+      setError('Full Name is required');
+      return;
+    }
+    if (!age || parseInt(age) <= 0) {
+      setError('Age is required and must be greater than 0');
+      return;
+    }
+    if (!gender) {
+      setError('Gender is required');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -38,12 +50,19 @@ export default function NewCustomerRegistration() {
       if (profilePhoto) formData.append('photo', profilePhoto);
       if(gender) formData.append('gender', gender);
 
-      await axiosInstance.post('/customers', formData, {
+      const response = await axiosInstance.post('/customers', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      const createdCustomer = response.data?.data;
+      
       navigate('/book-appointment', {
-        state: { fullName, mobileNumber },
+        state: { 
+          fullName, 
+          mobileNumber,
+          customerId: createdCustomer?.id,
+          customerExists: true
+        },
       });
     } catch (err: any) {
       const message =
@@ -398,7 +417,7 @@ export default function NewCustomerRegistration() {
                 </button>
                 <button
                   onClick={handleContinue}
-                  disabled={!fullName || submitting}
+                  disabled={!fullName.trim() || !age || !gender || submitting}
                   style={{
                     width: '264px',
                     height: '51px',
@@ -408,11 +427,11 @@ export default function NewCustomerRegistration() {
                     alignItems: 'center',
                     gap: '7px',
                     borderRadius: '4px',
-                    background: fullName && !submitting
+                    background: fullName.trim() && age && gender && !submitting
                       ? 'linear-gradient(90deg, #75B640 0%, #52813C 100%)'
                       : 'linear-gradient(90deg, #a0a0a0 0%, #808080 100%)',
                     border: 'none',
-                    cursor: fullName && !submitting ? 'pointer' : 'not-allowed',
+                    cursor: fullName.trim() && age && gender && !submitting ? 'pointer' : 'not-allowed',
                     transition: 'all 0.3s ease',
                   }}>
                   <span style={{

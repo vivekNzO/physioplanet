@@ -109,15 +109,12 @@ function AppointmentsPageContent() {
 
   const debouncedPhone = useDebounce(formData.newCustomer.phone || "", 400)
   const lookupController = React.useRef<AbortController | null>(null)
-  // skip the next lookup when a suggestion is selected programmatically
   const skipNextLookup = React.useRef(false)
+  const hasCustomerFromNav = React.useRef(false)
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
 
   const location = useLocation()
-
-  // If navigated here with state (e.g., CheckIn -> BookAppointment), prefill customer data
   useEffect(() => {
-    // Also support ?customerId= in URL
     try {
       const params = new URLSearchParams(location.search)
       const qCid = params.get('customerId')
@@ -157,6 +154,7 @@ function AppointmentsPageContent() {
 
     // If a customerId is passed, fetch full customer details and prefill
     if (st.customerId) {
+      hasCustomerFromNav.current = true
       ;(async () => {
         try {
           setCustomerLookupLoading(true)
@@ -209,6 +207,11 @@ function AppointmentsPageContent() {
   useEffect(() => {
     const raw = debouncedPhone || ""
     const phone = raw.replace(/\D/g, "")
+
+    // Skip lookup if customer already loaded from navigation state
+    if (hasCustomerFromNav.current && formData.customerId) {
+      return
+    }
 
     // If we just selected a suggestion, skip this one lookup cycle
     if (skipNextLookup.current) {
@@ -420,69 +423,6 @@ function AppointmentsPageContent() {
     }
   }
 
-  const handleBookAppointment = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.staffId || !formData.startAt || !formData.endAt) {
-      toast.error("Please fill in all required fields")
-      return
-    }
-
-    if (!formData.isNewCustomer && !formData.customerId) {
-      toast.error("Please select a customer or create a new one")
-      return
-    }
-
-    if (formData.isNewCustomer && (!formData.newCustomer.firstName || !formData.newCustomer.lastName)) {
-      toast.error("Please enter customer first and last name")
-      return
-    }
-
-    try {
-      const payload: any = {
-        staffId: formData.staffId,
-        startAt: new Date(formData.startAt).toISOString(),
-        endAt: new Date(formData.endAt).toISOString(),
-        price: parseFloat(formData.price) || 0,
-        currency: "USD",
-        status: "CONFIRMED" as AppointmentStatus,
-        notes: formData.notes || null,
-        customerNotes: formData.customerNotes || null,
-      }
-
-      if (formData.isNewCustomer) {
-        payload.customer = {
-          firstName: formData.newCustomer.firstName,
-          lastName: formData.newCustomer.lastName,
-          email: formData.newCustomer.email || null,
-          phone: formData.newCustomer.phone || null,
-          dateOfBirth: formData.newCustomer.dateOfBirth
-            ? new Date(formData.newCustomer.dateOfBirth).toISOString()
-            : null,
-        }
-      } else {
-        payload.customerId = formData.customerId
-      }
-
-      const response = await axiosInstance.post("/appointments", payload)
-
-      if (!response?.data?.success) {
-        toast.error(response?.data?.error || "Failed to book appointment")
-        return
-      }
-
-      toast.success("Appointment booked successfully")
-
-      // dialog removed - no modal to close
-       fetchAppointments()
-       if (formData.isNewCustomer) {
-         fetchCustomers()
-       }
-    } catch (error) {
-      toast.error("An unexpected error occurred")
-    }
-  }
-
   const handleSelectSlot = (slot: Slot) => {
     try {
       console.log('slot selected', slot)
@@ -558,7 +498,7 @@ function AppointmentsPageContent() {
         // Use the customer data from the form
         payload.customer = {
           firstName: formData.newCustomer.firstName || "Walk-in",
-          lastName: formData.newCustomer.lastName || "Guest",
+          lastName: formData.newCustomer.lastName || null,
           email: formData.newCustomer.email || null,
           phone: formData.newCustomer.phone || null,
           dateOfBirth: formData.newCustomer.dateOfBirth ? new Date(formData.newCustomer.dateOfBirth).toISOString() : null,
@@ -567,7 +507,7 @@ function AppointmentsPageContent() {
         // No customer data provided, create default walk-in customer
         payload.customer = {
           firstName: "Walk-in",
-          lastName: "Guest",
+          lastName: null,
         }
       }
     } else {
@@ -594,7 +534,7 @@ function AppointmentsPageContent() {
       
       fetchAppointments()
       if (formData.isNewCustomer) fetchCustomers()
-      navigate('/customer-records')
+      navigate('/reception-dashboard')
     } catch (error) {
       console.error('Continue booking error', error)
       toast.error("An unexpected error occurred")

@@ -84,11 +84,10 @@ export default function TimeSlots({
   const isSlotPast = (slot: Slot): boolean => {
     const now = new Date()
     const slotStart = new Date(slot.startIso)
-    
-    // If the slot start time has passed, it's a past slot
-    // We allow the current slot (where now is between start and end)
     return slotStart < now
   }
+
+  const availableSlots = slots.filter(slot => slot.available && !isSlotPast(slot))
 
   return (
     <div className="space-y-3 max-h-[250px] overflow-hidden">
@@ -108,24 +107,20 @@ export default function TimeSlots({
 
       <div className="max-h-[260px] overflow-auto no-scrollbar pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="grid grid-cols-2 gap-[10px]">
-          {slots.map(slot => {
+          {availableSlots.map(slot => {
             const label = `${format(
               new Date(slot.startIso),
               "hh:mm"
             )}-${format(new Date(slot.endIso), "hh:mm a")}`
 
-            const isPast = isSlotPast(slot)
-            const isDisabled = !slot.available || isPast
-
             return (
               <button
                 key={slot.id}
-                disabled={isDisabled}
                 onClick={() => onSelect(slot)}
                 className={`px-[26.5px] py-[10px] rounded text-sm text-center ${
-                  !isDisabled
-                    ? `${slot.id === selectedSlotId ? 'bg-[#74B446] text-white ring-2 ring-[#74B446]/40 whitespace-nowrap' : 'bg-[#E3F0DA] hover:bg-[#74B446] hover:text-white text-[#344256] whitespace-nowrap'}`
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  slot.id === selectedSlotId 
+                    ? 'bg-[#74B446] text-white ring-2 ring-[#74B446]/40 whitespace-nowrap' 
+                    : 'bg-[#E3F0DA] hover:bg-[#74B446] hover:text-white text-[#344256] whitespace-nowrap'
                 }`}
               >
                 <div className="font-medium whitespace-nowrap">{label}</div>
@@ -138,7 +133,7 @@ export default function TimeSlots({
             )
           })}
 
-          {!loading && slots.length === 0 && (
+          {!loading && availableSlots.length === 0 && (
             <div className="col-span-2 text-center text-sm text-gray-500">
               No slots available
             </div>

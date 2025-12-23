@@ -16,6 +16,21 @@ interface CustomerData {
   gender?: string
   dateOfBirth?: string
   notes?: string
+  age?: number
+  weight?: number
+  bloodGroup?: string
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  metadata?: {
+    photo?: {
+      name: string
+      type: string
+      size: number
+      data: string
+    }
+  }
 }
 
 interface Appointment {
@@ -42,6 +57,12 @@ export default function CustomerProfile() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('future')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editFormData, setEditFormData] = useState<Partial<CustomerData>>({})
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (!customerId) {
@@ -58,6 +79,8 @@ export default function CustomerProfile() {
         // Fetch customer data from backend
         const { data: customerRes } = await axiosInstance.get(`/customers/${customerId}`)
         if (customerRes?.data) {
+          console.log('Customer data received:', customerRes.data)
+          console.log('Customer metadata:', customerRes.data.metadata)
           setCustomer(customerRes.data)
         }
 
@@ -82,6 +105,117 @@ export default function CustomerProfile() {
     fetchCustomerData()
   }, [customerId])
 
+  const handleOpenEditModal = () => {
+    if (customer) {
+      setEditFormData({
+        firstName: customer.firstName,
+        lastName: customer.lastName || undefined,
+        phone: customer.phone || undefined,
+        email: customer.email || undefined,
+        gender: customer.gender,
+        dateOfBirth: customer.dateOfBirth,
+        age: customer.age,
+        weight: customer.weight,
+        bloodGroup: customer.bloodGroup,
+        address: customer.address,
+        city: customer.city,
+        state: customer.state,
+        zipCode: customer.zipCode,
+        notes: customer.notes,
+      })
+      setPhotoPreview(
+        customer.metadata?.photo?.data
+          ? `data:${customer.metadata.photo.type};base64,${customer.metadata.photo.data}`
+          : null
+      )
+      setPhotoFile(null)
+      setEditError(null)
+      setShowEditModal(true)
+    }
+  }
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false)
+    setEditFormData({})
+    setPhotoPreview(null)
+    setPhotoFile(null)
+    setEditError(null)
+  }
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setPhotoFile(file)
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setPhotoPreview(event.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleEditInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target
+    // Type coerce age and weight to numbers
+    const parsedValue = (name === 'age' || name === 'weight') && value ? parseInt(value, 10) : value
+    setEditFormData((prev) => ({
+      ...prev,
+      [name]: value === '' ? undefined : parsedValue,
+    }))
+  }
+
+  const handleSaveChanges = async () => {
+    if (!customer) return
+
+    try {
+      setEditLoading(true)
+      setEditError(null)
+
+      // Validate required fields
+      if (!editFormData.firstName || editFormData.firstName.trim() === '') {
+        setEditError('First Name is required')
+        return
+      }
+
+      const formData = new FormData()
+      
+      // Add all fields except photo
+      Object.entries(editFormData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          formData.append(key, String(value))
+        }
+      })
+
+      // Add photo file if exists
+      if (photoFile) {
+        formData.append('photo', photoFile)
+      }
+
+      // Send PUT request with multipart/form-data
+      const { data: updatedCustomer } = await axiosInstance.put(
+        `/customers/${customer.id}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+
+      if (updatedCustomer?.data) {
+        setCustomer(updatedCustomer.data)
+        handleCloseEditModal()
+      }
+    } catch (err: any) {
+      console.error('Error saving customer:', err)
+      setEditError(err.response?.data?.message || err.message || 'Failed to save changes')
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
   if (loading) {
     return <CustomerProfileSkeleton />
   }
@@ -97,13 +231,16 @@ export default function CustomerProfile() {
     )
   }
 
-  const fullName = `${customer.firstName} ${customer.lastName || ''}`
+  const fullName = customer.lastName 
+    ? `${customer.firstName} ${customer.lastName}` 
+    : customer.firstName
   const futureAppointments = appointments.filter(
     (a) => new Date(a.startAt) > new Date() && a.status !== 'CANCELLED'
   )
   const pastAppointments = appointments.filter(
     (a) => new Date(a.startAt) <= new Date() || a.status === 'COMPLETED'
   )
+  pastAppointments.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime())
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-cyan-100">
@@ -115,10 +252,18 @@ export default function CustomerProfile() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {/* Profile Card */}
             <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
-              <div className="w-24 h-24 rounded-full bg-gray-300 mb-4 flex items-center justify-center">
-                <span className="text-3xl font-bold text-gray-600">
-                  {customer.firstName[0]}{customer.lastName?.[0] || ''}
-                </span>
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 mb-4 flex items-center justify-center overflow-hidden">
+                {customer.metadata?.photo?.data ? (
+                  <img
+                    src={`data:${customer.metadata.photo.type};base64,${customer.metadata.photo.data}`}
+                    alt={fullName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-3xl font-bold text-white">
+                    {customer.firstName[0]}{customer.lastName?.[0] || ''}
+                  </span>
+                )}
               </div>
               <h3 className="text-lg font-semibold text-center">{fullName}</h3>
               {customer.phone && <p className="text-sm text-gray-600 mt-1">{customer.phone}</p>}
@@ -127,7 +272,15 @@ export default function CustomerProfile() {
 
             {/* General Information */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-4">General <span className="text-blue-600">Information</span></h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">General <span className="text-blue-600">Information</span></h3>
+                <button
+                  onClick={handleOpenEditModal}
+                  className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition"
+                >
+                  Edit
+                </button>
+              </div>
               <div className="space-y-3 text-sm">
                 {customer.gender && (
                   <div className="flex justify-between">
@@ -139,6 +292,34 @@ export default function CustomerProfile() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Date Of Birth:</span>
                     <span className="font-medium">{new Date(customer.dateOfBirth).toLocaleDateString()}</span>
+                  </div>
+                )}
+                {(customer.age || customer.weight) && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Age & Weight:</span>
+                    <span className="font-medium">
+                      {customer.age ? `${customer.age} Year` : ''}{customer.age && customer.weight ? ' & ' : ''}{customer.weight ? `${customer.weight}kg` : ''}
+                    </span>
+                  </div>
+                )}
+                {customer.bloodGroup && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Blood Group:</span>
+                    <span className="font-medium">{customer.bloodGroup}</span>
+                  </div>
+                )}
+                {customer.address && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Address:</span>
+                    <span className="font-medium text-right text-xs">{customer.address}</span>
+                  </div>
+                )}
+                {(customer.city || customer.state || customer.zipCode) && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Location:</span>
+                    <span className="font-medium text-right text-xs">
+                      {[customer.city, customer.state, customer.zipCode].filter(Boolean).join(', ')}
+                    </span>
                   </div>
                 )}
                 {customer.notes && (
@@ -249,6 +430,286 @@ export default function CustomerProfile() {
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Edit Customer Information</h2>
+              <button
+                onClick={handleCloseEditModal}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6">
+              {editError && (
+                <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {editError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Photo Upload */}
+                <div className="md:col-span-2 flex flex-col items-center">
+                  <div className="w-32 h-32 rounded-full bg-gray-200 mb-4 flex items-center justify-center overflow-hidden">
+                    {photoPreview ? (
+                      <img
+                        src={photoPreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-4xl text-gray-400">
+                        {editFormData.firstName?.[0]}{editFormData.lastName?.[0] || ''}
+                      </span>
+                    )}
+                  </div>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                    />
+                    <span className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition inline-block">
+                      Choose Photo
+                    </span>
+                  </label>
+                </div>
+
+                {/* Form Fields */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={editFormData.firstName || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="First Name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={editFormData.lastName || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Last Name (Optional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={editFormData.email || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Email (Optional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={editFormData.phone || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Phone (Optional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gender
+                  </label>
+                  <select
+                    name="gender"
+                    value={editFormData.gender || ''}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={editFormData.dateOfBirth?.toString().split('T')[0] || ''}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Age (Years)
+                  </label>
+                  <input
+                    type="number"
+                    name="age"
+                    value={editFormData.age || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Age"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    name="weight"
+                    value={editFormData.weight || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Weight"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Blood Group
+                  </label>
+                  <select
+                    name="bloodGroup"
+                    value={editFormData.bloodGroup || ''}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Blood Group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={editFormData.address || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Street Address"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={editFormData.city || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="City"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={editFormData.state || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="State"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Zip Code
+                  </label>
+                  <input
+                    type="text"
+                    name="zipCode"
+                    value={editFormData.zipCode || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Zip Code"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={editFormData.notes || ''}
+                    onChange={handleEditInputChange}
+                    placeholder="Additional Notes"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-6 flex gap-4">
+                <button
+                  onClick={handleCloseEditModal}
+                  disabled={editLoading}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={editLoading}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+                >
+                  {editLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
