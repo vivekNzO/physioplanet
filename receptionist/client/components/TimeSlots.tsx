@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 import { format } from "date-fns"
 import TimeSlotSkeleton from "@/skeletons/TimeSlotSkeleton"
 import axiosInstance from "@/lib/axios"
+import { formatTimeInIst12Hour } from "@/utils/dateUtils"
 
 export type Slot = {
   id: string
@@ -108,10 +109,10 @@ export default function TimeSlots({
       <div className="max-h-[260px] overflow-auto no-scrollbar pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="grid grid-cols-2 gap-[10px]">
           {availableSlots.map(slot => {
-            const label = `${format(
-              new Date(slot.startIso),
-              "hh:mm"
-            )}-${format(new Date(slot.endIso), "hh:mm a")}`
+            // Format UTC times to IST for display using our utility
+            const startTime = formatTimeInIst12Hour(slot.startIso).replace(' ', '');
+            const endTime = formatTimeInIst12Hour(slot.endIso);
+            const label = `${startTime}-${endTime}`.toLowerCase();
 
             return (
               <button

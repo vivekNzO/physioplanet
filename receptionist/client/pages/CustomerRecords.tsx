@@ -348,7 +348,7 @@ function CustomerRecords() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-100">
       <Navbar />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-10 py-10">
         <div className="bg-white rounded-lg shadow-md p-6">
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
