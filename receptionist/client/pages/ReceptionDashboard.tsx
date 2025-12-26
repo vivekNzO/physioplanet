@@ -13,6 +13,7 @@ import QueuePageSkeleton from "@/skeletons/QueuePageSkeleton";
 import AppointmentDetailsSkeleton from "@/skeletons/AppointmentDetailsSkeleton";
 import { getDefaultStatus } from "@/utils/statusHelper";
 import { getTodayRangeInUtc } from "@/utils/dateUtils";
+import BookNewAppointmentDialog from "@/components/dialogs/BookNewAppointmentDialog";
 
 export default function ReceptionDashboard() {
   const [queueData, setQueueData] = useState<QueueItem[]>([]);
@@ -22,6 +23,7 @@ export default function ReceptionDashboard() {
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
+  const [bookNewAppointmentOpen, setBookNewAppointmentOpen] = useState(false);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -37,7 +39,6 @@ export default function ReceptionDashboard() {
       }, 500);
       return () => clearTimeout(timer);
     } else {
-      // Reset to today's appointments when search is cleared
       setIsSearchMode(false);
       fetchTodaysAppointments();
     }
@@ -68,7 +69,6 @@ export default function ReceptionDashboard() {
           // Determine queue status based on appointment timing using statusHelper
           let queueStatus = PatientQueueStatus.WAITING;
           
-          // Use the same logic as CustomerRecords for consistency
           if (apt.status === "CANCELLED") {
             queueStatus = PatientQueueStatus.WAITING; // Keep as waiting for cancelled
           } else {
@@ -126,10 +126,7 @@ export default function ReceptionDashboard() {
   };
 
   const handleSelectCustomer = async (item: QueueItem) => {
-    // Set the selected item immediately for UI responsiveness
     setSelectedItem(item);
-
-    // If appointments are already loaded, no need to fetch again
     if (item.appointments.length > 0) {
       return;
     }
@@ -250,7 +247,9 @@ export default function ReceptionDashboard() {
                   </div>
                 )}
               </div>
-              <Button className="bg-gradient-to-b from-[#0557A8] to-[#1BB7E9] text-white shrink-0">
+              <Button className="bg-gradient-to-b from-[#0557A8] to-[#1BB7E9] text-white shrink-0"
+              onClick={()=>setBookNewAppointmentOpen(true)}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 New Appointment
               </Button>
@@ -295,6 +294,11 @@ export default function ReceptionDashboard() {
       </div>
       )}
       </div>
+      <BookNewAppointmentDialog
+        open={bookNewAppointmentOpen}
+        onOpenChange={setBookNewAppointmentOpen}
+        
+      />
     </div>
   );
 }

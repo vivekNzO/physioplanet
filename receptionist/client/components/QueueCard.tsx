@@ -105,7 +105,14 @@ export default function QueueCard({ item, isSelected, onClick }: QueueCardProps)
     .slice(0, 2);
 
   // Get avatar URL from metadata if present
-  const avatarUrl = item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
+  // Check for direct URL first (avatar/profileImage)
+  let avatarUrl = item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
+  
+  // If not found, check for base64 photo data
+  if (!avatarUrl && item.customer.metadata?.photo?.data) {
+    const photoMeta = item.customer.metadata.photo;
+    avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
+  }
 
   return (
     <div
