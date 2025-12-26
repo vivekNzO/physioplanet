@@ -70,7 +70,7 @@ export default function ReceptionDashboard() {
           let queueStatus = PatientQueueStatus.WAITING;
           
           if (apt.status === "CANCELLED") {
-            queueStatus = PatientQueueStatus.WAITING; // Keep as waiting for cancelled
+            queueStatus = PatientQueueStatus.CANCELLED;
           } else {
             const autoStatus = getDefaultStatus(apt.startAt);
             if (autoStatus === "Waiting") {
@@ -78,7 +78,7 @@ export default function ReceptionDashboard() {
             } else if (autoStatus === "In Exercise") {
               queueStatus = PatientQueueStatus.IN_EXERCISE;
             } else if (autoStatus === "Completed") {
-              queueStatus = PatientQueueStatus.FULL_PAID;
+              queueStatus = PatientQueueStatus.COMPLETED;
             }
           }
 
@@ -107,9 +107,6 @@ export default function ReceptionDashboard() {
       const queueItems = Array.from(customerMap.values()).map(item => ({
         ...item,
         pendingAmount: item.totalAmount - item.paidAmount,
-        queueStatus: item.pendingAmount === 0 && item.paidAmount > 0 
-          ? PatientQueueStatus.FULL_PAID 
-          : item.queueStatus
       }));
 
       setQueueData(queueItems);

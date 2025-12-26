@@ -3,11 +3,13 @@ import { useState } from "react";
 import GeneralInformationDialog from "./dialogs/GeneralInformationDialog";
 import ClientLastFeedbackDialog from "./dialogs/ClientLastFeedbackDialog";
 import { Pencil } from "lucide-react";
+import { getDefaultStatus } from "@/utils/statusHelper";
 
 export enum PatientQueueStatus {
   IN_EXERCISE = "IN_EXERCISE",
   WAITING = "WAITING",
-  FULL_PAID = "FULL_PAID",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
   PENDING = "PENDING"
 }
 
@@ -73,6 +75,7 @@ interface AppointmentDetailsPanelProps {
 export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPanelProps) {
   const [generalInfoOpen, setGeneralInfoOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [prescriptionPhotos, setPrescriptionPhotos] = useState<{ id: number; url: string }[]>([]);
 
   const fullName = `${item.customer.firstName || ""} ${item.customer.lastName || ""}`.trim() || "Unknown Patient";
   const initials = fullName
@@ -92,11 +95,37 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
   }
 
-  // Mock data for prescriptions - in real app, this would come from API
-  const prescriptionPhotos = [
-    { id: 1, url: "/placeholder-prescription-1.jpg" },
-    { id: 2, url: "/placeholder-prescription-2.jpg" },
-  ];
+  // Handle prescription photo upload/capture
+  const handlePrescriptionPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const newPhotos = Array.from(files).map((file, index) => ({
+        id: Date.now() + index,
+        url: URL.createObjectURL(file),
+      }));
+      setPrescriptionPhotos((prev) => [...prev, ...newPhotos]);
+    }
+  };
+
+  // Get automatic status based on time
+  const getAppointmentStatus = (appointment: Appointment) => {
+    if (appointment.status === "CANCELLED") return "Cancelled";
+    if (appointment.status === "COMPLETED") return "Completed";
+    
+    // Calculate automatic status based on time
+    const autoStatus = getDefaultStatus(appointment.startAt);
+    return autoStatus;
+  };
+
+  // Get status badge color
+  const getStatusBadgeColor = (status: string) => {
+    const statusLower = status.toLowerCase();
+    if (statusLower === "completed") return "bg-green-100 text-green-700 border-green-300";
+    if (statusLower === "cancelled") return "bg-red-100 text-red-700 border-red-300";
+    if (statusLower === "in exercise") return "bg-blue-100 text-blue-700 border-blue-300";
+    if (statusLower === "waiting") return "bg-yellow-100 text-yellow-700 border-yellow-300";
+    return "bg-gray-100 text-gray-700 border-gray-300";
+  };
 
   const futureVisits = item.appointments.filter((apt) => utcToIst(apt.startAt) > new Date());
   const pastVisits = item.appointments.filter((apt) => utcToIst(apt.startAt) <= new Date());
@@ -176,30 +205,71 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                 Prescription <span className="text-[#1D5287] font-bold">Photos</span>
             </h3>
             <CardContent className="p-0">
-              <div className="flex items-start gap-4 bg-white">
-                <Button variant="outline" className="flex items-center gap-2 px-[5px] py-[5px] text-[10px] font-medium flex-col justify-center">
-                  <img src="/Mask group (5).png"/>
-                  <span>Click Photo</span>
-                </Button>
-                <div className="grid grid-cols-2 gap-3 flex-1">
-                  {prescriptionPhotos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="aspect-video bg-gray-100 rounded-lg border border-gray-300 overflow-hidden"
+              <div className="flex items-start gap-4 bg-white border border-dashed border-[#E5E5E5] rounded-lg p-[11px]">
+                <div className="flex flex-col items-center gap-2">
+                  <input
+                    type="file"
+                    id="prescription-upload"
+                    className="hidden"
+                    accept="image/*"
+                    capture="environment"
+                    multiple
+                    onChange={handlePrescriptionPhoto}
+                  />
+                  <label htmlFor="prescription-upload">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="flex items-center justify-center flex-col gap-[5px] h-auto px-[19.5px] py-[11.5px] bg-[#EEF7FB] hover:bg-blue-50 cursor-pointer rounded-lg"
+                      onClick={() => document.getElementById('prescription-upload')?.click()}
                     >
-                      <img
-                        src={photo.url}
-                        alt="Prescription"
-                        className="w-full h-full object-cover"
-                      />
+                      <div className="w-12 h-12 rounded-full  flex items-center justify-center">
+                        <img src="/Mask group (6).png" className="h-[25px] w-[25px] text-white" />
+                      </div>
+                      <span className="text-[10px] font-medium text-gray-700">Click Photo</span>
+                    </Button>
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3 flex-1">
+                  {prescriptionPhotos.length > 0 ? (
+                    <>
+                      {prescriptionPhotos.slice(0, 2).map((photo) => (
+                        <div
+                          key={photo.id}
+                          className="aspect-video bg-gray-100 rounded-lg border border-gray-300 overflow-hidden"
+                        >
+                          <img
+                            src={photo.url}
+                            alt="Prescription"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                      {prescriptionPhotos.length > 2 && (
+                        <div className="aspect-video bg-blue-50 rounded-lg border border-blue-300 overflow-hidden flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">
+                              +{prescriptionPhotos.length - 2}
+                            </div>
+                            <div className="text-xs text-blue-600 font-medium">
+                              more
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="col-span-2 flex items-center justify-center text-gray-400 text-sm h-full min-h-[100px]">
+                      No photos added yet
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
-              <p className="text-xs text-gray-600 bg-green-50 p-3 rounded border border-green-200 mt-4">
-                <span className="font-semibold">Note:</span> Always click a clean photo of your
-                Prescription for better results.
-              </p>
+              <div className="bg-[#F0F9E8] border border-[#D4E7C5] rounded p-3 mt-4">
+                <p className="text-xs text-gray-700">
+                  <span className="font-semibold text-[#52813C]">Note:-</span> Always click a clean photos of your Prescription for getting better results.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -295,18 +365,21 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                       </thead>
                       <tbody className="bg-white">
                         {futureVisits.length > 0 ? (
-                          futureVisits.map((appointment) => (
-                            <tr key={appointment.id} className="border-b border-gray-100">
-                              <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
-                              <td className="p-4 text-sm">{appointment.staff?.displayName || "Dr. Sahil Behl"}</td>
-                              <td className="p-4 text-sm">{format(utcToIst(appointment.startAt), "MM/dd/yyyy")}</td>
-                              <td className="p-4">
-                                <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
-                                  Scheduled
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))
+                          futureVisits.map((appointment) => {
+                            const displayStatus = getAppointmentStatus(appointment);
+                            return (
+                              <tr key={appointment.id} className="border-b border-gray-100">
+                                <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
+                                <td className="p-4 text-sm">{appointment.staff?.displayName || "Dr. Sahil Behl"}</td>
+                                <td className="p-4 text-sm">{format(utcToIst(appointment.startAt), "MM/dd/yyyy")}</td>
+                                <td className="p-4">
+                                  <Badge className={getStatusBadgeColor(displayStatus)}>
+                                    {displayStatus}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          })
                         ) : (
                           <tr>
                             <td colSpan={4} className="p-8 text-center text-gray-500">
@@ -336,24 +409,21 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                       </thead>
                       <tbody className="bg-white">
                         {pastVisits.length > 0 ? (
-                          pastVisits.map((appointment) => (
-                            <tr key={appointment.id} className="border-b border-gray-100">
-                              <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
-                              <td className="p-4 text-sm">{appointment.staff?.displayName || "N/A"}</td>
-                              <td className="p-4 text-sm">{format(utcToIst(appointment.startAt), "MM/dd/yyyy")}</td>
-                              <td className="p-4">
-                                <Badge className={
-                                  appointment.status === "COMPLETED" 
-                                    ? "bg-green-100 text-green-700 border-green-300"
-                                    : appointment.status === "CANCELLED"
-                                    ? "bg-red-100 text-red-700 border-red-300"
-                                    : "bg-gray-100 text-gray-700 border-gray-300"
-                                }>
-                                  {appointment.status === "COMPLETED" ? "Completed" : appointment.status === "CANCELLED" ? "Cancelled" : appointment.status}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))
+                          pastVisits.map((appointment) => {
+                            const displayStatus = getAppointmentStatus(appointment);
+                            return (
+                              <tr key={appointment.id} className="border-b border-gray-100">
+                                <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
+                                <td className="p-4 text-sm">{appointment.staff?.displayName || "N/A"}</td>
+                                <td className="p-4 text-sm">{format(utcToIst(appointment.startAt), "MM/dd/yyyy")}</td>
+                                <td className="p-4">
+                                  <Badge className={getStatusBadgeColor(displayStatus)}>
+                                    {displayStatus}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          })
                         ) : (
                           <tr>
                             <td colSpan={4} className="p-8 text-center text-gray-500">

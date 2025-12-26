@@ -1,10 +1,15 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import axiosInstance from "@/lib/axios";
+import toast from "react-hot-toast";
+import { useState } from "react";
 
 export enum PatientQueueStatus {
   IN_EXERCISE = "IN_EXERCISE",
   WAITING = "WAITING",
-  FULL_PAID = "FULL_PAID",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
   PENDING = "PENDING"
 }
 
@@ -57,17 +62,49 @@ interface QueueCardProps {
   item: QueueItem;
   isSelected: boolean;
   onClick: () => void;
+  onStatusChange?: (itemId: string, newStatus: PatientQueueStatus) => void;
 }
 
-export default function QueueCard({ item, isSelected, onClick }: QueueCardProps) {
+export default function QueueCard({ item, isSelected, onClick, onStatusChange }: QueueCardProps) {
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Handle status update
+  const handleStatusUpdate = async (newStatus: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation(); // Prevent card click
+    setUpdatingStatus(true);
+    try {
+      // Update via API if there are appointments
+      if (item.appointments && item.appointments.length > 0) {
+        const appointmentId = item.appointments[0].id;
+        await axiosInstance.patch(`/appointments/${appointmentId}`, {
+          status: newStatus.toUpperCase(),
+        });
+      }
+      
+      // Call parent callback to update UI
+      if (onStatusChange) {
+        onStatusChange(item.id, newStatus as PatientQueueStatus);
+      }
+      
+      toast.success(`Status updated to ${getStatusText(newStatus as PatientQueueStatus)}`);
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      toast.error(error.response?.data?.error || 'Failed to update status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const getStatusColor = (status: PatientQueueStatus) => {
     switch (status) {
       case PatientQueueStatus.IN_EXERCISE:
         return "bg-emerald-100 text-emerald-700 border-emerald-300";
       case PatientQueueStatus.WAITING:
         return "bg-rose-100 text-rose-700 border-rose-300";
-      case PatientQueueStatus.FULL_PAID:
-        return "bg-emerald-100 text-emerald-700 border-emerald-300";
+      case PatientQueueStatus.COMPLETED:
+        return "bg-green-100 text-green-700 border-green-300";
+      case PatientQueueStatus.CANCELLED:
+        return "bg-red-100 text-red-700 border-red-300";
       case PatientQueueStatus.PENDING:
         return "bg-amber-100 text-amber-700 border-amber-300";
       default:
@@ -81,8 +118,10 @@ export default function QueueCard({ item, isSelected, onClick }: QueueCardProps)
         return "In Exercise";
       case PatientQueueStatus.WAITING:
         return "Waiting";
-      case PatientQueueStatus.FULL_PAID:
-        return "Full Paid";
+      case PatientQueueStatus.COMPLETED:
+        return "Completed";
+      case PatientQueueStatus.CANCELLED:
+        return "Cancelled";
       case PatientQueueStatus.PENDING:
         return "Pending";
       default:
@@ -131,7 +170,7 @@ export default function QueueCard({ item, isSelected, onClick }: QueueCardProps)
       <div className="flex flex-1 justify-between">
         <div className="flex flex-col items-start justify-between mb-1">
           <h3 className="font-semibold text-gray-900 truncate">{fullName}</h3>
-            <span
+          <span
             className={`font-medium ${
               item.queueStatus === PatientQueueStatus.IN_EXERCISE
                 ? "text-emerald-600"
@@ -140,9 +179,23 @@ export default function QueueCard({ item, isSelected, onClick }: QueueCardProps)
                 : "text-gray-600"
             }`}
           >
-                <Badge className={`text-xs ${getStatusColor(item.queueStatus)} border min-w-[85px] flex items-center justify-center`}>
-                    {getStatusText(item.queueStatus)}
-                </Badge>
+            <div onClick={(e) => e.stopPropagation()}>
+              <Select
+                value={item.queueStatus}
+                onValueChange={(value) => handleStatusUpdate(value)}
+                disabled={updatingStatus}
+              >
+                <SelectTrigger className={`text-xs ${getStatusColor(item.queueStatus)} border-0 min-w-[85px] h-auto p-1 [&>svg]:hidden focus:ring-0 focus:ring-offset-0`}>
+                  <SelectValue>{getStatusText(item.queueStatus)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WAITING">Waiting</SelectItem>
+                  <SelectItem value="IN_EXERCISE">In Exercise</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </span>
         </div>
 
