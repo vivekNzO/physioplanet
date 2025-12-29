@@ -340,7 +340,7 @@ export default function BookNewAppointmentDialog({
         endAt: null,
         status: 'PENDING',
         price: 0,
-        currency: 'USD',
+        currency: 'INR',
         notes: '',
         customerNotes: '',
         appointmentType: 'WALKIN',

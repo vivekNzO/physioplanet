@@ -147,6 +147,8 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
     const photoMeta = item.customer.metadata.photo;
     avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
   }
+  
+  const isWalkIn = item.appointments && item.appointments[0]?.appointmentType === 'WALKIN';
 
   return (
     <div
@@ -163,7 +165,7 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
       </Avatar>
 
       <div className="flex flex-1 justify-between">
-        <div className="flex flex-col items-start justify-between mb-1">
+        <div className="flex flex-col items-start justify-between">
           <h3 className="font-semibold text-gray-900 truncate">{fullName}</h3>
           <span
             className={`font-medium ${
@@ -194,7 +196,7 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
           </span>
         </div>
 
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-col items-center justify-between text-sm">
           <span className={`font-semibold ${getPendingAmountColor()}`}>
             {item.pendingAmount === 0 ? (
               <span className="flex items-center gap-1">
@@ -207,6 +209,17 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
               </span>
             )}
           </span>
+          <div>
+            {isWalkIn ? (
+              <Badge variant="outline" className="text-xs border-gray-300 text-gray-600">
+                Walk-in
+              </Badge>
+            ):(
+              <Badge variant="outline" className="text-xs border-gray-300 text-gray-600">
+                Pre-Booked
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
     </div>
