@@ -55,27 +55,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (username: string, password: string) => {
     try {
       // Get CSRF token
-      const csrfRes = await fetch('http://localhost:3000/api/auth/csrf', {
-        credentials: 'include',
-      });
-      const { csrfToken } = await csrfRes.json();
+        const csrfRes = await axiosInstance.get('/auth/csrf');
+        const { csrfToken } = csrfRes.data;
 
       // Login with credentials - tell NextAuth NOT to redirect
-      const res = await fetch('http://localhost:3000/api/auth/callback/credentials', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        credentials: 'include',
-        redirect: 'manual', // CRITICAL: Don't follow redirects
-        body: new URLSearchParams({
+      const res = await axiosInstance.post('/auth/callback/credentials',
+        new URLSearchParams({
           csrfToken,
           username,
           password,
           redirect: 'false', // Tell NextAuth not to redirect
           json: 'true', // Request JSON response
         }),
-      });
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          maxRedirects: 0,
+          validateStatus: status => status < 400 // allow 302
+        }
+      );
 
       // Check if login was successful (NextAuth returns 200 for JSON, 302 for redirect)
       if (res.status === 401 || res.status === 403) {
@@ -97,24 +94,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       // Get CSRF token for signout
-      const csrfRes = await fetch('http://localhost:3000/api/auth/csrf', {
-        credentials: 'include',
-      });
-      const { csrfToken } = await csrfRes.json();
+      const csrfRes = await axiosInstance.get('/auth/csrf');
+      const { csrfToken } = csrfRes.data;
 
       // Call signout endpoint with CSRF token and prevent redirect
-      await fetch('http://localhost:3000/api/auth/signout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        credentials: 'include',
-        redirect: 'manual', // Don't follow redirects
-        body: new URLSearchParams({
+      await axiosInstance.post('/auth/signout',
+        new URLSearchParams({
           csrfToken,
           json: 'true', // Request JSON response
         }),
-      });
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }
+      );
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
