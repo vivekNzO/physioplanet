@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await axiosInstance.get("/auth/session");
       setUser(res.data?.user ?? null);
-      setTenantId(res.data?.user?.currentTenantId ?? "cmi7et46x0000pj2zmdsp82rm"); //TODO
+      setTenantId(res.data?.user?.currentTenantId ?? "cmi7glb2m0071fpeapl4d0y9j"); //TODO
     } catch {
       setUser(null);
       setTenantId(null);
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await refreshSession();
 
       // Set the current tenant ID (hardcoded for now, can be dynamic later)
-      const tenantId = "cmi7et46x0000pj2zmdsp82rm";
+      const tenantId = "cmi7glb2m0071fpeapl4d0y9j";
       await axiosInstance.post('/tenant/current', { tenantId });
     } catch (err: any) {
       const msg = err?.message || 'Login failed';
