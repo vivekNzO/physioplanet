@@ -487,6 +487,7 @@ function AppointmentsPageContent() {
       status: "CONFIRMED",
       notes: formData.notes || null,
       customerNotes: formData.customerNotes || null,
+      appointmentType: 'PREBOOKING',
     }
 
     if (!formData.customerId) {

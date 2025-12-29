@@ -70,18 +70,16 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
 
   // Handle status update
   const handleStatusUpdate = async (newStatus: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation(); // Prevent card click
+    if (e) e.stopPropagation();
     setUpdatingStatus(true);
+    console.log('item is',item)
     try {
-      // Update via API if there are appointments
       if (item.appointments && item.appointments.length > 0) {
         const appointmentId = item.appointments[0].id;
-        await axiosInstance.patch(`/appointments/${appointmentId}`, {
-          status: newStatus.toUpperCase(),
+        await axiosInstance.put(`/appointments/${appointmentId}`, {
+          status: newStatus,
         });
       }
-      
-      // Call parent callback to update UI
       if (onStatusChange) {
         onStatusChange(item.id, newStatus as PatientQueueStatus);
       }
@@ -143,11 +141,8 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
     .toUpperCase()
     .slice(0, 2);
 
-  // Get avatar URL from metadata if present
-  // Check for direct URL first (avatar/profileImage)
   let avatarUrl = item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
   
-  // If not found, check for base64 photo data
   if (!avatarUrl && item.customer.metadata?.photo?.data) {
     const photoMeta = item.customer.metadata.photo;
     avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
@@ -185,7 +180,7 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
                 onValueChange={(value) => handleStatusUpdate(value)}
                 disabled={updatingStatus}
               >
-                <SelectTrigger className={`text-xs ${getStatusColor(item.queueStatus)} border-0 min-w-[85px] h-auto p-1 [&>svg]:hidden focus:ring-0 focus:ring-offset-0`}>
+                <SelectTrigger className={`text-xs ${getStatusColor(item.queueStatus)} border-0 flex justify-center min-w-[85px] h-auto p-1 [&>svg]:hidden focus:ring-0 focus:ring-offset-0`}>
                   <SelectValue>{getStatusText(item.queueStatus)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>

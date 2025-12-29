@@ -8,8 +8,10 @@ const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in millisecond
 /**
  * Convert a UTC date/string to IST Date object
  */
-export function utcToIst(utcDate: Date | string): Date {
+export function utcToIst(utcDate: Date | string | null | undefined): Date | null {
+  if (!utcDate) return null;
   const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
+  if (isNaN(date.getTime())) return null;
   return new Date(date.getTime() + IST_OFFSET_MS);
 }
 
@@ -23,13 +25,12 @@ export function istToUtc(istDate: Date): Date {
 /**
  * Format a UTC date/string as IST time string (HH:mm format)
  */
-export function formatTimeInIst(utcDate: Date | string): string {
+export function formatTimeInIst(utcDate: Date | string | null | undefined): string {
+  if (!utcDate) return "-";
   const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
-  // Get UTC time and add IST offset manually
+  if (isNaN(date.getTime())) return "-";
   const istTime = date.getTime() + IST_OFFSET_MS;
   const istDate = new Date(istTime);
-  
-  // Use UTC methods to avoid local timezone interpretation
   const hours = istDate.getUTCHours().toString().padStart(2, '0');
   const minutes = istDate.getUTCMinutes().toString().padStart(2, '0');
   return `${hours}:${minutes}`;
@@ -38,30 +39,29 @@ export function formatTimeInIst(utcDate: Date | string): string {
 /**
  * Format a UTC date/string as IST time with AM/PM (hh:mm AM/PM format)
  */
-export function formatTimeInIst12Hour(utcDate: Date | string): string {
+export function formatTimeInIst12Hour(utcDate: Date | string | null | undefined): string {
+  if (!utcDate) return "-";
   const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
+  if (isNaN(date.getTime())) return "-";
   const istTime = date.getTime() + IST_OFFSET_MS;
   const istDate = new Date(istTime);
-  
   let hours = istDate.getUTCHours();
   const minutes = istDate.getUTCMinutes().toString().padStart(2, '0');
   const ampm = hours >= 12 ? 'PM' : 'AM';
-  
   hours = hours % 12;
   hours = hours ? hours : 12; // Convert 0 to 12
-  
   return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
 }
 
 /**
  * Format a UTC date/string as IST date string (DD/MM/YYYY format)
  */
-export function formatDateInIst(utcDate: Date | string): string {
+export function formatDateInIst(utcDate: Date | string | null | undefined): string {
+  if (!utcDate) return "-";
   const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
+  if (isNaN(date.getTime())) return "-";
   const istTime = date.getTime() + IST_OFFSET_MS;
   const istDate = new Date(istTime);
-  
-  // Use UTC methods to avoid local timezone interpretation
   const day = istDate.getUTCDate().toString().padStart(2, '0');
   const month = (istDate.getUTCMonth() + 1).toString().padStart(2, '0');
   const year = istDate.getUTCFullYear();
@@ -71,7 +71,8 @@ export function formatDateInIst(utcDate: Date | string): string {
 /**
  * Format a UTC date/string as IST datetime string (DD/MM/YYYY HH:mm format)
  */
-export function formatDateTimeInIst(utcDate: Date | string): string {
+export function formatDateTimeInIst(utcDate: Date | string | null | undefined): string {
+  if (!utcDate) return "-";
   const date = formatDateInIst(utcDate);
   const time = formatTimeInIst(utcDate);
   return `${date} ${time}`;
@@ -107,6 +108,6 @@ export function getTodayRangeInUtc(): { start: Date; end: Date } {
 /**
  * Format time range in IST (e.g., "09:00 - 09:30")
  */
-export function formatTimeRangeInIst(startUtc: Date | string, endUtc: Date | string): string {
+export function formatTimeRangeInIst(startUtc: Date | string | null | undefined, endUtc: Date | string | null | undefined): string {
   return `${formatTimeInIst(startUtc)} - ${formatTimeInIst(endUtc)}`;
 }

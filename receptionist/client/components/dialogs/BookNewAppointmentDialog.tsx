@@ -315,8 +315,6 @@ export default function BookNewAppointmentDialog({
 
     setIsLoading(true);
     try {
-      // For now, we'll just create/update the customer
-      // Appointment scheduling will be handled later
       let customerId = formData.customerId;
 
       if (formData.isNewCustomer) {
@@ -329,15 +327,32 @@ export default function BookNewAppointmentDialog({
             age: formData.customer.age,
           },
         };
-
         const response = await axiosInstance.post("/customers", customerData);
         customerId = response.data.data.id;
       }
 
+      // Always create a walk-in appointment for this customer
+      const appointmentData = {
+        staffId: null, // You may want to select/assign a staff member in the UI
+        serviceId: null,
+        customerId,
+        startAt: null,
+        endAt: null,
+        status: 'PENDING',
+        price: 0,
+        currency: 'USD',
+        notes: '',
+        customerNotes: '',
+        appointmentType: 'WALKIN',
+      };
+
+      // You may want to prompt for staffId/serviceId in the dialog; for now, set as null
+      await axiosInstance.post("/appointments", appointmentData);
+
       toast.success(
         formData.isNewCustomer
-          ? "Customer registered successfully! You can now schedule an appointment."
-          : "Customer details confirmed! Ready to schedule appointment."
+          ? "Walk-in appointment created successfully!"
+          : "Walk-in appointment created for existing customer!"
       );
 
       onSuccess?.();

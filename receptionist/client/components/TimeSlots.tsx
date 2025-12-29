@@ -118,18 +118,18 @@ export default function TimeSlots({
               <button
                 key={slot.id}
                 onClick={() => onSelect(slot)}
-                className={`px-[26.5px] py-[10px] rounded text-sm text-center ${
+                className={`px-[26.5px] py-[20px] rounded text-sm text-center ${
                   slot.id === selectedSlotId 
                     ? 'bg-[#74B446] text-white ring-2 ring-[#74B446]/40 whitespace-nowrap' 
                     : 'bg-[#E3F0DA] hover:bg-[#74B446] hover:text-white text-[#344256] whitespace-nowrap'
                 }`}
               >
                 <div className="font-medium whitespace-nowrap">{label}</div>
-                {slot.staffNames?.length ? (
+                {/* {slot.staffNames?.length ? (
                   <div className="text-[8px] whitespace-nowrap">
                     {slot.staffNames.join(", ")}
                   </div>
-                ) : null}
+                ) : null} */}
               </button>
             )
           })}

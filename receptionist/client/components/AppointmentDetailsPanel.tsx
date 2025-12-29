@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axiosInstance from "@/lib/axios";
 import GeneralInformationDialog from "./dialogs/GeneralInformationDialog";
 import ClientLastFeedbackDialog from "./dialogs/ClientLastFeedbackDialog";
 import { Pencil } from "lucide-react";
@@ -75,7 +76,8 @@ interface AppointmentDetailsPanelProps {
 export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPanelProps) {
   const [generalInfoOpen, setGeneralInfoOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [prescriptionPhotos, setPrescriptionPhotos] = useState<{ id: number; url: string }[]>([]);
+  const [prescriptionPhotos, setPrescriptionPhotos] = useState<{ id: string; imageUrl: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const fullName = `${item.customer.firstName || ""} ${item.customer.lastName || ""}`.trim() || "Unknown Patient";
   const initials = fullName
@@ -95,15 +97,48 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
   }
 
+  // Fetch prescriptions from backend
+  useEffect(() => {
+    const fetchPrescriptions = async () => {
+      if (!item.customer.id || !item.appointments[0]?.id) return;
+      try {
+        const res = await axiosInstance.get(
+          `/prescriptions?customerId=${item.customer.id}&appointmentId=${item.appointments[0].id}`
+        );
+        setPrescriptionPhotos(res.data.prescriptions || []);
+      } catch (err) {
+        setPrescriptionPhotos([]);
+      }
+    };
+    fetchPrescriptions();
+  }, [item.customer.id, item.appointments]);
+
   // Handle prescription photo upload/capture
-  const handlePrescriptionPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePrescriptionPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      const newPhotos = Array.from(files).map((file, index) => ({
-        id: Date.now() + index,
-        url: URL.createObjectURL(file),
-      }));
-      setPrescriptionPhotos((prev) => [...prev, ...newPhotos]);
+    if (!files || files.length === 0) return;
+
+    const formData = new FormData();
+    formData.append("appointmentId", item.appointments[0]?.id);
+    formData.append("customerId", item.customer.id);
+    Array.from(files).forEach(file => formData.append("images", file));
+
+    setUploading(true);
+    try {
+      await axiosInstance.post(
+        "/prescriptions",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      // Refresh prescription list
+      const res = await axiosInstance.get(
+        `/prescriptions?customerId=${item.customer.id}&appointmentId=${item.appointments[0].id}`
+      );
+      setPrescriptionPhotos(res.data.prescriptions || []);
+    } catch (err) {
+      alert("Upload failed");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -127,8 +162,8 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     return "bg-gray-100 text-gray-700 border-gray-300";
   };
 
-  const futureVisits = item.appointments.filter((apt) => utcToIst(apt.startAt) > new Date());
-  const pastVisits = item.appointments.filter((apt) => utcToIst(apt.startAt) <= new Date());
+  const futureVisits = item.appointments.filter((apt) => apt.startAt && utcToIst(apt.startAt) > new Date());
+  const pastVisits = item.appointments.filter((apt) => apt.startAt && utcToIst(apt.startAt) <= new Date());
 
   // Calculate package details
   const packageDetails = {
@@ -239,14 +274,14 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                           className="aspect-video bg-gray-100 rounded-lg border border-gray-300 overflow-hidden"
                         >
                           <img
-                            src={photo.url}
+                            src={photo.imageUrl}
                             alt="Prescription"
                             className="w-full h-full object-cover"
                           />
                         </div>
                       ))}
                       {prescriptionPhotos.length > 2 && (
-                        <div className="aspect-video bg-blue-50 rounded-lg border border-blue-300 overflow-hidden flex items-center justify-center">
+                        <div className="aspect-video bg-blue-50 rounded-lg border-blue-300 overflow-hidden flex items-center justify-center">
                           <div className="text-center">
                             <div className="text-2xl font-bold text-blue-600">
                               +{prescriptionPhotos.length - 2}
@@ -267,7 +302,8 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
               </div>
               <div className="bg-[#F0F9E8] border border-[#D4E7C5] rounded p-3 mt-4">
                 <p className="text-xs text-gray-700">
-                  <span className="font-semibold text-[#52813C]">Note:-</span> Always click a clean photos of your Prescription for getting better results.
+                  <span className="font-semibold text-[#52813C]">Note:-</span> Always click a clean photo of your Prescription for better results.
+                  {uploading && <span className="ml-2 text-blue-600">Uploading...</span>}
                 </p>
               </div>
             </CardContent>
@@ -371,7 +407,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                               <tr key={appointment.id} className="border-b border-gray-100">
                                 <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
                                 <td className="p-4 text-sm">{appointment.staff?.displayName || "Dr. Sahil Behl"}</td>
-                                <td className="p-4 text-sm">{format(utcToIst(appointment.startAt), "MM/dd/yyyy")}</td>
+                                <td className="p-4 text-sm">{appointment.startAt ? format(utcToIst(appointment.startAt), "MM/dd/yyyy") : "-"}</td>
                                 <td className="p-4">
                                   <Badge className={getStatusBadgeColor(displayStatus)}>
                                     {displayStatus}
@@ -415,7 +451,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                               <tr key={appointment.id} className="border-b border-gray-100">
                                 <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
                                 <td className="p-4 text-sm">{appointment.staff?.displayName || "N/A"}</td>
-                                <td className="p-4 text-sm">{format(utcToIst(appointment.startAt), "MM/dd/yyyy")}</td>
+                                <td className="p-4 text-sm">{appointment.startAt ? format(utcToIst(appointment.startAt), "MM/dd/yyyy") : "-"}</td>
                                 <td className="p-4">
                                   <Badge className={getStatusBadgeColor(displayStatus)}>
                                     {displayStatus}

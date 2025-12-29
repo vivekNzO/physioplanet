@@ -24,6 +24,11 @@ export default function ReceptionDashboard() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [bookNewAppointmentOpen, setBookNewAppointmentOpen] = useState(false);
+
+  // Callback to refresh queue after new appointment
+  const handleAppointmentCreated = async () => {
+    await fetchTodaysAppointments();
+  };
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -57,48 +62,89 @@ export default function ReceptionDashboard() {
       };
 
       const { data } = await axiosInstance.get("/appointments", { params });
-      const todaysAppointments = data?.data || [];
+      const allAppointments = data?.data || [];
 
-      // Group appointments by customer (only with today's appointments initially)
+      // Get today's date in IST
+      const now = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const istNow = new Date(now.getTime() + istOffset);
+      const istYear = istNow.getFullYear();
+      const istMonth = istNow.getMonth();
+      const istDate = istNow.getDate();
+
+      // Helper to check if a UTC date is today in IST
+      function isTodayInIST(utcDateStr) {
+        if (!utcDateStr) return false;
+        const utcDate = new Date(utcDateStr);
+        const istDateObj = new Date(utcDate.getTime() + istOffset);
+        return (
+          istDateObj.getFullYear() === istYear &&
+          istDateObj.getMonth() === istMonth &&
+          istDateObj.getDate() === istDate
+        );
+      }
+
+      // Filter for queue: prebookings with startAt today (IST), walk-ins with createdAt today (IST)
+      const todaysAppointments = allAppointments.filter((apt) => {
+        if (apt.appointmentType === 'WALKIN') {
+          return isTodayInIST(apt.createdAt);
+        } else if (apt.appointmentType === 'PREBOOKING') {
+          return isTodayInIST(apt.startAt);
+        }
+        return false;
+      });
+
+      // Group appointments by customer
       const customerMap = new Map<string, QueueItem>();
+      const allowedStatuses = [
+        PatientQueueStatus.WAITING,
+        PatientQueueStatus.IN_EXERCISE,
+        PatientQueueStatus.COMPLETED,
+        PatientQueueStatus.CANCELLED,
+      ];
 
       todaysAppointments.forEach((apt: any) => {
         const customerId = apt.customer?.id || apt.customerId;
-        
         if (!customerMap.has(customerId)) {
-          // Determine queue status based on appointment timing using statusHelper
           let queueStatus = PatientQueueStatus.WAITING;
-          
-          if (apt.status === "CANCELLED") {
-            queueStatus = PatientQueueStatus.CANCELLED;
-          } else {
-            const autoStatus = getDefaultStatus(apt.startAt);
-            if (autoStatus === "Waiting") {
+          if (apt.appointmentType === 'PREBOOKING') {
+            // If receptionist has set a valid status, use it
+            if (apt.status && allowedStatuses.includes(apt.status)) {
+              queueStatus = apt.status;
+            } else {
+              // Otherwise, use automatic logic
+              const autoStatus = getDefaultStatus(apt.startAt);
+              if (autoStatus === "Waiting") {
+                queueStatus = PatientQueueStatus.WAITING;
+              } else if (autoStatus === "In Exercise") {
+                queueStatus = PatientQueueStatus.IN_EXERCISE;
+              } else if (autoStatus === "Completed") {
+                queueStatus = PatientQueueStatus.COMPLETED;
+              }
+            }
+          } else if (apt.appointmentType === 'WALKIN') {
+            // For walk-ins, always WAITING by default unless receptionist overrides with a valid status
+            if (apt.status && allowedStatuses.includes(apt.status) && apt.status !== PatientQueueStatus.WAITING) {
+              queueStatus = apt.status;
+            } else {
               queueStatus = PatientQueueStatus.WAITING;
-            } else if (autoStatus === "In Exercise") {
-              queueStatus = PatientQueueStatus.IN_EXERCISE;
-            } else if (autoStatus === "Completed") {
-              queueStatus = PatientQueueStatus.COMPLETED;
             }
           }
-
           customerMap.set(customerId, {
             id: customerId,
             ticketNo: apt.id.slice(0, 5).toUpperCase(),
             customer: apt.customer,
-            appointments: [], // Will be loaded on selection
+            appointments: [apt], // Always include the current appointment for status updates
             queueStatus,
             totalAmount: 0,
             paidAmount: 0,
             pendingAmount: 0,
           });
         }
-
         const item = customerMap.get(customerId)!;
         item.totalAmount += parseFloat(apt.price);
-        
         // Mock paid amount - in real app, this would come from payment records
-        if (apt.status === "COMPLETED") {
+        if (apt.status === PatientQueueStatus.COMPLETED) {
           item.paidAmount += parseFloat(apt.price);
         }
       });
@@ -208,6 +254,17 @@ export default function ReceptionDashboard() {
     }
   };
 
+  // Status update handler for queue items
+  const handleQueueStatusChange = (itemId: string, newStatus: PatientQueueStatus) => {
+    setQueueData(prevQueue => prevQueue.map(item =>
+      item.id === itemId ? { ...item, queueStatus: newStatus } : item
+    ));
+    // Also update selected item if it's the same
+    setSelectedItem(prev =>
+      prev && prev.id === itemId ? { ...prev, queueStatus: newStatus } : prev
+    );
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-cyan-50 to-blue-100">
       {/* Header */}
@@ -266,6 +323,7 @@ export default function ReceptionDashboard() {
                 item={item}
                 isSelected={selectedItem?.id === item.id}
                 onClick={() => handleSelectCustomer(item)}
+                onStatusChange={handleQueueStatusChange}
               />
             ))}
           </div>
@@ -294,7 +352,7 @@ export default function ReceptionDashboard() {
       <BookNewAppointmentDialog
         open={bookNewAppointmentOpen}
         onOpenChange={setBookNewAppointmentOpen}
-        
+        onSuccess={handleAppointmentCreated}
       />
     </div>
   );
