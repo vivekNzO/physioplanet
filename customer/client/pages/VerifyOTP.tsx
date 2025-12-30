@@ -1,5 +1,6 @@
 'use client';
 
+import axiosInstance from '@/lib/axios';
 import { ArrowLeft } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -11,7 +12,7 @@ export default function VerifyOTP() {
   const navigate = useNavigate();
   const location = useLocation();
   const mobileNumber = location.state?.mobileNumber;
-  const expectedOtp = location.state?.otp as string | undefined;
+  // No expectedOtp in state; OTP is verified via backend
   const customerExists = location.state?.customerExists as boolean | undefined;
   const fullName = location.state?.fullName as string | undefined;
   const customerId = location.state?.customerId as string | undefined;
@@ -41,37 +42,39 @@ export default function VerifyOTP() {
     }
   };
 
-  const handleVerifyOTP = () => {
+  const handleVerifyOTP = async () => {
     const otpValue = otp.join('');
     if (otpValue.length === 6) {
-      if (!expectedOtp || otpValue === expectedOtp) {
-        if (customerExists) {
-          // Customer exists - redirect to appointment-check
-          navigate('/welcome-page', {
-            state: {
-              fullName,
-              mobileNumber,
-              customerId,
-            },
-          });
+      try {
+        const res = await axiosInstance.post('/twilio/verify-otp', { phone: mobileNumber, otp: otpValue });
+        if (res.data && res.data.success) {
+          if (customerExists) {
+            navigate('/welcome-page', {
+              state: {
+                fullName,
+                mobileNumber,
+                customerId,
+              },
+            });
+          } else {
+            navigate('/new-customer-registration', {
+              state: { mobileNumber },
+            });
+          }
         } else {
-          // New customer - redirect to new-customer-registration
-          navigate('/new-customer-registration', {
-            state: { mobileNumber },
-          });
+          toast.error(res.data.error || 'Invalid OTP');
         }
-      } else {
-        toast.error('Invalid OTP');
+      } catch (err) {
+        toast.error('Failed to verify OTP');
       }
     }
   };
 
-  const handleResendOTP = () => {
-    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    alert(`Your new OTP is: ${newOtp}`);
-    navigate('.', { state: { ...location.state, otp: newOtp }, replace: true });
+  const handleResendOTP = async () => {
+    await axiosInstance.post('/twilio/send-otp', { phone: mobileNumber });
     setOtp(['', '', '', '', '', '']);
     inputRefs.current[0]?.focus();
+    toast.success('OTP resent via WhatsApp');
   };
 
   const isOtpComplete = otp.every(digit => digit !== '');

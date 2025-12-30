@@ -34,19 +34,16 @@ export default function CheckIn() {
       const data = res?.data?.data ?? [];
       const customerExists = data.length > 0;
 
-      // Generate OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      alert(`Your OTP is: ${otp}`);
+      // Send WhatsApp OTP
+      await axiosInstance.post('/twilio/send-otp', { phone: mobileNumber });
 
       if (customerExists) {
         const customer = data[0];
         const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(' ') || 'Unknown';
-        
         // Customer exists - navigate to verify OTP then appointment-check
         navigate('/verify-otp', {
           state: {
             mobileNumber: customer.phone || mobileNumber,
-            otp,
             customerExists: true,
             fullName: fullName,
             customerId: customer.id,
@@ -57,7 +54,6 @@ export default function CheckIn() {
         navigate('/verify-otp', {
           state: {
             mobileNumber: mobileNumber,
-            otp,
             customerExists: false,
           },
         });
