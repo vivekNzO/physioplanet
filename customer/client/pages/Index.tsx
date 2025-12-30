@@ -4,21 +4,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Index() {
-  // const [selectedBox, setSelectedBox] = useState<number | null>(null);
   const navigate = useNavigate();
-
-  // const handleContinue = () => {
-  //   if (selectedBox === 0) {
-  //     // Customer/Staff flow → Appointment Check
-  //     navigate('/appointment-check');
-  //   } else if (selectedBox === 1) {
-  //     // Book Appointment flow
-  //     navigate('/check-in', { state: { flowType: 'appointment' } });
-  //   } else if (selectedBox === 2) {
-  //     // Services flow (to be implemented later)
-  //     console.log('Services flow - to be implemented');
-  //   }
-  // };
 
   return (
     <div style={{

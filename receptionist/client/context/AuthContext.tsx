@@ -30,10 +30,6 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-      console.log("[DIAG] AuthProvider mounted");
-      return () => console.log("[DIAG] AuthProvider unmounted");
-  }, []);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);

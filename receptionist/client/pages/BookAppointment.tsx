@@ -425,7 +425,6 @@ function AppointmentsPageContent() {
 
   const handleSelectSlot = (slot: Slot) => {
     try {
-      console.log('slot selected', slot)
       setSelectedSlot(slot)
 
       const safeStart = slot?.startIso ? String(slot.startIso).slice(0, 16) : ""
@@ -461,7 +460,6 @@ function AppointmentsPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleContinue = async () => {
-    console.log('handleContinue invoked', { selectedSlot, formData })
     if (isSubmitting) return
 
     if (!selectedSlot) {
@@ -469,12 +467,6 @@ function AppointmentsPageContent() {
       return
     }
     const staffForSlot = formData.staffId || (selectedSlot.staffIds && selectedSlot.staffIds[0]) || ""
-
-    console.log('Customer data:', {
-      customerId: formData.customerId,
-      isNewCustomer: formData.isNewCustomer,
-      customerData: formData.newCustomer
-    })
 
     // Resolve customer: use selected customerId if present; otherwise create customer from form data
     const payload: any = {
@@ -491,7 +483,6 @@ function AppointmentsPageContent() {
     }
 
     if (!formData.customerId) {
-      console.log('Creating new customer')
       // Create new customer with provided data or default to walk-in
       const hasCustomerData = formData.newCustomer.firstName || formData.newCustomer.lastName || formData.newCustomer.phone
       
@@ -512,12 +503,8 @@ function AppointmentsPageContent() {
         }
       }
     } else {
-      console.log('Using existing customer ID:', formData.customerId)
       payload.customerId = formData.customerId
     }
-
-    console.log('Final payload:', payload)
-
     try {
       setIsSubmitting(true)
       const response = await axiosInstance.post('/appointments', payload)

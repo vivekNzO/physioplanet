@@ -14,7 +14,6 @@ export default function AppointmentCustomerDetails() {
 
   const handleContinue = () => {
     if (fullName) {
-      console.log({ fullName, age, gender, profilePhoto, mobileNumber });
       navigate('/book-appointment', { state: { mobileNumber, fullName, age, gender } });
     }
   };

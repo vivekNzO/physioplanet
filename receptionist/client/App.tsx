@@ -32,9 +32,7 @@ const queryClient = new QueryClient();
 
 // Create a new component that uses useAuth
 function AppRoutes() {
-  const { user, loading,tenantId } = useAuth();
-  console.log(tenantId);
-  
+  const { user, loading,tenantId } = useAuth();  
   if (loading) return <IndexSkeleton/>
   
   return (

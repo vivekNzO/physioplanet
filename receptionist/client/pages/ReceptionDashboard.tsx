@@ -16,10 +16,6 @@ import { getTodayRangeInUtc } from "@/utils/dateUtils";
 import BookNewAppointmentDialog from "@/components/dialogs/BookNewAppointmentDialog";
 
 export default function ReceptionDashboard() {
-  console.log("[DIAG] ReceptionDashboard mounted");
-  useEffect(() => () => {
-    console.log("[DIAG] ReceptionDashboard unmounted");
-  }, []);
   const [queueData, setQueueData] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");

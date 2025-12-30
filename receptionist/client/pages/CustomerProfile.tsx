@@ -79,8 +79,6 @@ export default function CustomerProfile() {
         // Fetch customer data from backend
         const { data: customerRes } = await axiosInstance.get(`/customers/${customerId}`)
         if (customerRes?.data) {
-          console.log('Customer data received:', customerRes.data)
-          console.log('Customer metadata:', customerRes.data.metadata)
           setCustomer(customerRes.data)
         }
 

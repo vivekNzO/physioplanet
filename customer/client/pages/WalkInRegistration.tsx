@@ -14,7 +14,6 @@ export default function WalkInRegistration() {
 
   const handleContinue = () => {
     if (fullName) {
-      console.log({ fullName, age, gender, profilePhoto, mobileNumber });
       navigate('/patient-dashboard', {
         state: {
           mobileNumber,

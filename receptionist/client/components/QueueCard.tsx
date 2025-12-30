@@ -72,7 +72,6 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
   const handleStatusUpdate = async (newStatus: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setUpdatingStatus(true);
-    console.log('item is',item)
     try {
       if (item.appointments && item.appointments.length > 0) {
         const appointmentId = item.appointments[0].id;
