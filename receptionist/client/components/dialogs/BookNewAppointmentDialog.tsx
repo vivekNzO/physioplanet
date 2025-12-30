@@ -1,4 +1,9 @@
 import { useState, useEffect, useRef } from "react";
+
+// Utility to capitalize the first letter of every word
+function capitalizeWords(str: string) {
+  return str.replace(/\b\w+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
 import {
   Dialog,
   DialogContent,
@@ -462,7 +467,7 @@ export default function BookNewAppointmentDialog({
                     const value = e.target.value.replace(/[^a-zA-Z\s.'-]/g, "");
                     setFormData((prev) => ({
                       ...prev,
-                      customer: { ...prev.customer, firstName: value },
+                      customer: { ...prev.customer, firstName: capitalizeWords(value) },
                     }));
                   }}
                   disabled={!showCustomerFields}

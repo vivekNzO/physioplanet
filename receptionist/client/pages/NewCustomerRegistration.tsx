@@ -5,6 +5,11 @@ import axiosInstance from '@/lib/axios';
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+// Utility to capitalize the first letter of every word
+function capitalizeWords(str: string) {
+  return str.replace(/\b\w+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
+
 export default function NewCustomerRegistration() {
   const [fullName, setFullName] = useState('');
   const [age, setAge] = useState('');
@@ -18,7 +23,8 @@ export default function NewCustomerRegistration() {
 
   const [firstName, lastName] = useMemo(() => {
     if (!fullName.trim()) return ['', ''];
-    const parts = fullName.trim().split(/\s+/);
+    const capitalized = capitalizeWords(fullName.trim());
+    const parts = capitalized.split(/\s+/);
     const first = parts.shift() ?? '';
     const last = parts.length ? parts.join(' ') : '';
     return [first, last];
@@ -26,8 +32,13 @@ export default function NewCustomerRegistration() {
 
   const handleContinue = async () => {
     // Validation
+    const nameRegex = /^[A-Za-zÀ-ÿ'\- ]+$/;
     if (!fullName.trim()) {
       setError('Full Name is required');
+      return;
+    }
+    if (!nameRegex.test(fullName.trim())) {
+      setError('Full Name must only contain letters, spaces, apostrophes, or hyphens');
       return;
     }
     if (!age || parseInt(age) <= 0) {
@@ -78,7 +89,8 @@ export default function NewCustomerRegistration() {
   function getInitials(name: string) {
     if (!name) return "NE";
 
-    const parts = name.trim().split(" ").filter(Boolean);
+    const capitalized = capitalizeWords(name.trim());
+    const parts = capitalized.split(" ").filter(Boolean);
     if (parts.length === 1) return parts[0][0].toUpperCase();
 
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -178,7 +190,7 @@ export default function NewCustomerRegistration() {
                   /> 
                 ):(
                   <span className='text-white text-lg font-semibold'>
-                    {getInitials(fullName)}
+                    {getInitials(capitalizeWords(fullName))}
                   </span>
                 )}
               </div>
@@ -195,7 +207,7 @@ export default function NewCustomerRegistration() {
                   fontWeight: 600,
                   lineHeight: '1',
                 }}>
-                  {fullName || 'Not Entered'}
+                  {fullName ? capitalizeWords(fullName) : 'Not Entered'}
                 </div>
                 <div style={{
                   display: 'flex',
@@ -282,8 +294,8 @@ export default function NewCustomerRegistration() {
                     </label>
                     <input
                       type='text'
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      value={capitalizeWords(fullName)}
+                      onChange={(e) => setFullName(capitalizeWords(e.target.value))}
                       placeholder='Enter your Full Name'
                       className='w-full h-[51px] px-[21px] radius-[4px] background-white border border-[#E9EAEB] text-[#0D0D0D] text-sm font-normal outline-none '
                     />

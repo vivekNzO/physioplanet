@@ -16,11 +16,15 @@ import { getTodayRangeInUtc } from "@/utils/dateUtils";
 import BookNewAppointmentDialog from "@/components/dialogs/BookNewAppointmentDialog";
 
 export default function ReceptionDashboard() {
-  console.log("ReceptionDashboard mounted");
+  console.log("[DIAG] ReceptionDashboard mounted");
+  useEffect(() => () => {
+    console.log("[DIAG] ReceptionDashboard unmounted");
+  }, []);
   const [queueData, setQueueData] = useState<QueueItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<QueueItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Used for background updates only
+    const [isInitialLoad, setIsInitialLoad] = useState(true); // Only true on first mount/navigation
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
@@ -34,7 +38,11 @@ export default function ReceptionDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchTodaysAppointments();
+      (async () => {
+        setIsInitialLoad(true);
+        await fetchTodaysAppointments();
+        setIsInitialLoad(false);
+      })();
   }, []);
 
   // Debounce search
@@ -51,7 +59,8 @@ export default function ReceptionDashboard() {
   }, [searchQuery]);
 
   const fetchTodaysAppointments = async () => {
-    setLoading(true);
+     // Only set loading if not initial load
+     if (!isInitialLoad) setLoading(true);
     try {
       // Get today's date range in UTC using the helper function
       const { start: utcStartOfToday, end: utcEndOfToday } = getTodayRangeInUtc();
@@ -165,7 +174,7 @@ export default function ReceptionDashboard() {
       console.error("Error fetching appointments:", error);
       toast.error("Failed to load appointments");
     } finally {
-      setLoading(false);
+      if (!isInitialLoad) setLoading(false);
     }
   };
 
@@ -266,6 +275,8 @@ export default function ReceptionDashboard() {
     );
   };
 
+  // if(isInitialLoad)return <QueuePageSkeleton/>
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-cyan-50 to-blue-100">
       {/* Header */}
@@ -273,7 +284,7 @@ export default function ReceptionDashboard() {
     
       {/* Main Content */}
       <div className="container mx-auto px-10 py-10">
-      {loading ? (<QueuePageSkeleton/>):(
+      {isInitialLoad ? (<QueuePageSkeleton/>):(
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Queue List */}
         <div className="w-96 border-r bg-white border-gray-200 flex flex-col shadow-sm mr-[10px]">
