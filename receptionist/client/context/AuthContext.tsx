@@ -35,20 +35,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [tenantId, setTenantId] = useState<string | null>(null);
 
   useEffect(() => {
-    refreshSession();
+    initializeAuth();
   }, []);
 
-  const refreshSession = async () => {
+  const initializeAuth = async () => {
     setLoading(true);
+    try {
+      // First, fetch tenant ID based on current domain
+      const fetchedTenantId = await fetchTenantByDomain();
+      // Then fetch the session
+      await refreshSession();
+      console.log('Auth initialized with tenantId:', fetchedTenantId);
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      setUser(null);
+      // Don't set tenantId to null here, let fetchTenantByDomain handle the fallback
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTenantByDomain = async () => {
+    try {
+      const currentDomain = window.location.port 
+        ? `${window.location.hostname}:${window.location.port}` 
+        : window.location.hostname;
+      console.log('Fetching tenant for domain:', currentDomain);
+      const res = await axiosInstance.get(`/tenant/by-domain?domain=${currentDomain}`);
+      console.log('Tenant API response:', res.data);
+      
+      if (res.data?.success && res.data?.tenantId) {
+        setTenantId(res.data.tenantId);
+        localStorage.setItem('tenantId', res.data.tenantId);
+        console.log('Tenant ID set to:', res.data.tenantId);
+        return res.data.tenantId;
+      }
+    } catch (error) {
+      console.error('Error fetching tenant by domain:', error);
+      // Fallback to localStorage if available
+      const storedTenantId = localStorage.getItem('tenantId');
+      if (storedTenantId) {
+        console.log('Using stored tenant ID:', storedTenantId);
+        setTenantId(storedTenantId);
+        return storedTenantId;
+      }
+    }
+    const fallbackTenantId = 'cmi7et46x0000pj2zmdsp82rm';
+    console.log('Using fallback tenant ID:', fallbackTenantId);
+    setTenantId(fallbackTenantId);
+    localStorage.setItem('tenantId', fallbackTenantId);
+    return fallbackTenantId;
+  };
+
+  const refreshSession = async () => {
     try {
       const res = await axiosInstance.get("/auth/session");
       setUser(res.data?.user ?? null);
-      setTenantId(res.data?.user?.currentTenantId ?? "cmiwu5n8l005i42zxh8lrhfd5"); //TODO
-    } catch {
+      
+      // If tenant ID is not set yet, try to get it from session or fetch by domain
+      if (!tenantId) {
+        const sessionTenantId = res.data?.user?.currentTenantId;
+        if (sessionTenantId) {
+          setTenantId(sessionTenantId);
+        } else {
+          await fetchTenantByDomain();
+        }
+      }
+    } catch (error) {
+      console.error('Session refresh error:', error);
       setUser(null);
-      setTenantId(null);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -82,9 +137,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // After successful login, fetch the session
       await refreshSession();
 
-      // Set the current tenant ID (hardcoded for now, can be dynamic later)
-      const tenantId = "cmiwu5n8l005i42zxh8lrhfd5";
-      await axiosInstance.post('/tenant/current', { tenantId });
+      // Fetch tenant ID by domain instead of hardcoding
+      const fetchedTenantId = await fetchTenantByDomain();
+      
+      if (fetchedTenantId) {
+        // Set the current tenant ID
+        await axiosInstance.post('/tenant/current', { tenantId: fetchedTenantId });
+      }
     } catch (err: any) {
       const msg = err?.message || 'Login failed';
       throw new Error(msg);
@@ -110,9 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      // Always clear local state
+      // Always clear local state and localStorage
       setUser(null);
       setTenantId(null);
+      localStorage.removeItem('tenantId');
     }
   };
 

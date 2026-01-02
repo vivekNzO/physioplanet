@@ -27,11 +27,11 @@ export default function CheckIn() {
       setError(null);
 
       // Check if customer exists
-      const res = await axiosInstance.get('/customers', {
-        params: { phone: mobileNumber, limit: 1 },
+      const res = await axiosInstance.get('/customers/public', {
+        params: { phone: mobileNumber },
       });
 
-      const data = res?.data?.data ?? [];
+      const data = res?.data ?? [];
       const customerExists = data.length > 0;
 
       // Send WhatsApp OTP

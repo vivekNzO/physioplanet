@@ -103,9 +103,11 @@ export default function SellPlanDialog({ open, onClose, onSelect }: SellPlanDial
                   className={`rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
                     selectedId === pkg.id ? 'bg-[#E3F0D9]' : 'bg-[#F8F8F8]'
                   }`}
-                  onClick={() => handleSelect(pkg.id)}
                 >
-                  <div className="flex items-center justify-between p-4">
+                  <div 
+                    className="flex items-center justify-between p-4"
+                    onClick={() => handleSelect(pkg.id)}
+                  >
                     <div className="flex items-center gap-3">
                       {selectedId === pkg.id ? (
                         <div className="w-6 h-6 rounded-full bg-[#1D5287] flex items-center justify-center flex-shrink-0">
@@ -120,7 +122,7 @@ export default function SellPlanDialog({ open, onClose, onSelect }: SellPlanDial
                     </div>
                     <div className="text-[#1D5287] text-nowrap font-bold text-base">₹{pkg.finalPrice || pkg.price}</div>
                   </div>
-                  {pkg.packageItems && pkg.packageItems.length > 0 && (
+                  {selectedId === pkg.id && pkg.packageItems && pkg.packageItems.length > 0 && (
                     <div className="bg-white space-y-2 pt-2 max-h-[240px] overflow-y-auto px-2 pb-2">
                       {pkg.packageItems.map(item => (
                         <div
@@ -162,9 +164,11 @@ export default function SellPlanDialog({ open, onClose, onSelect }: SellPlanDial
                   className={`rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
                     selectedId === pkg.id ? 'bg-[#E3F0D9]' : 'bg-[#F8F8F8]'
                   }`}
-                  onClick={() => handleSelect(pkg.id)}
                 >
-                  <div className="flex items-center justify-between p-4">
+                  <div 
+                    className="flex items-center justify-between p-4"
+                    onClick={() => handleSelect(pkg.id)}
+                  >
                     <div className="flex items-center gap-3">
                       {selectedId === pkg.id ? (
                         <div className="w-6 h-6 rounded-full bg-[#1D5287] flex items-center justify-center flex-shrink-0">
@@ -179,7 +183,7 @@ export default function SellPlanDialog({ open, onClose, onSelect }: SellPlanDial
                     </div>
                     <div className="text-[#1D5287] font-bold text-base whitespace-nowrap">₹{pkg.finalPrice || pkg.price}</div>
                   </div>
-                  {pkg.packageItems && pkg.packageItems.length > 0 && (
+                  {selectedId === pkg.id && pkg.packageItems && pkg.packageItems.length > 0 && (
                     <div className="bg-white space-y-2 pt-2 max-h-[240px] overflow-y-auto px-2 pb-2">
                       {pkg.packageItems.map(item => (
                         <div

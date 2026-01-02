@@ -13,5 +13,14 @@ const axiosInstance = axios.create({
   },
 });
 
+// Add tenant ID to all requests from localStorage
+axiosInstance.interceptors.request.use((config) => {
+  const tenantId = localStorage.getItem('tenantId');
+  if (tenantId) {
+    config.headers['x-tenant-id'] = tenantId;
+  }
+  return config;
+});
+
 export default axiosInstance;
 

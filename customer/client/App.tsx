@@ -21,30 +21,28 @@ import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import LoginPage from "./pages/LoginPage";
 import IndexSkeleton from "@/skeletons/IndexSkeleton";
 
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   if (loading) return <IndexSkeleton />;
   return (
     <Routes>
-      <Route path="/login" element={!user ? <LoginPage /> : <Index />} />
-      <Route path="/" element={user ? <Index /> : <LoginPage />} />
-      <Route path="/check-in" element={user ? <CheckIn /> : <LoginPage />} />
-      <Route path="/new-customer-registration" element={user ? <NewCustomerRegistration /> : <LoginPage />} />
-      <Route path="/appointment-check" element={user ? <AppointmentCheck /> : <LoginPage />} />
-      <Route path="/verify-appointment-otp" element={user ? <VerifyAppointmentOTP /> : <LoginPage />} />
-      <Route path="/verify-otp" element={user ? <VerifyOTP /> : <LoginPage />} />
-      <Route path="/verification-success" element={user ? <VerificationSuccess /> : <LoginPage />} />
-      <Route path="/walk-in-check-in" element={user ? <WalkInCheckIn /> : <LoginPage />} />
-      <Route path="/walk-in-registration" element={user ? <WalkInRegistration /> : <LoginPage />} />
-      <Route path="/patient-dashboard" element={user ? <PatientDashboard /> : <LoginPage />} />
-      <Route path="/appointment-customer-details" element={user ? <AppointmentCustomerDetails /> : <LoginPage />} />
-      <Route path="/whatsapp-confirmation" element={user ? <WhatsAppConfirmation /> : <LoginPage />} />
-      <Route path="/welcome-page" element={user ? <WelcomePage /> : <LoginPage />} />
+      <Route path="/" element={<Index />} />
+      <Route path="/check-in" element={<CheckIn />} />
+      <Route path="/new-customer-registration" element={<NewCustomerRegistration />} />
+      <Route path="/appointment-check" element={<AppointmentCheck />} />
+      <Route path="/verify-appointment-otp" element={<VerifyAppointmentOTP />} />
+      <Route path="/verify-otp" element={<VerifyOTP />} />
+      <Route path="/verification-success" element={<VerificationSuccess />} />
+      <Route path="/walk-in-check-in" element={<WalkInCheckIn />} />
+      <Route path="/walk-in-registration" element={<WalkInRegistration />} />
+      <Route path="/patient-dashboard" element={<PatientDashboard />} />
+      <Route path="/appointment-customer-details" element={<AppointmentCustomerDetails />} />
+      <Route path="/whatsapp-confirmation" element={<WhatsAppConfirmation />} />
+      <Route path="/welcome-page" element={<WelcomePage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

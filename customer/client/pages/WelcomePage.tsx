@@ -21,10 +21,10 @@ function WelcomePage() {
       }
       try {
         setLoadingPhoto(true);
-        const res = await axiosInstance.get('/customers', {
-          params: { phone: mobileNumber, limit: 1 },
+        const res = await axiosInstance.get('/customers/public', {
+          params: { phone: mobileNumber },
         });
-        const customer = res?.data?.data?.[0];
+        const customer = res?.data?.[0];
         const photo = customer?.metadata?.photo;
         if (photo?.data) {
           const type = photo.type || 'image/png';

@@ -49,7 +49,7 @@ export default function NewCustomerRegistration() {
       if (profilePhoto) formData.append('photo', profilePhoto);
       if(gender) formData.append('gender', gender);
 
-      await axiosInstance.post('/customers', formData, {
+      await axiosInstance.post('/customers/public', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
