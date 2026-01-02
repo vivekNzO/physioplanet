@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import axiosInstance from "@/lib/axios";
 import GeneralInformationDialog from "./dialogs/GeneralInformationDialog";
 import ClientLastFeedbackDialog from "./dialogs/ClientLastFeedbackDialog";
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { getDefaultStatus } from "@/utils/statusHelper";
 
 export enum PatientQueueStatus {
@@ -68,6 +68,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Phone, Mail, Plus, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { utcToIst } from "@/utils/dateUtils";
+import SellPlanDialog from "./dialogs/SellPlanDialog";
 
 interface AppointmentDetailsPanelProps {
   item: QueueItem;
@@ -76,8 +77,14 @@ interface AppointmentDetailsPanelProps {
 export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPanelProps) {
   const [generalInfoOpen, setGeneralInfoOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [prescriptionPhotos, setPrescriptionPhotos] = useState<{ id: string; imageUrl: string }[]>([]);
+  const [prescriptionPhotos, setPrescriptionPhotos] = useState<{ id: string; imageUrl: string; uploadedAt: string }[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [allAppointments, setAllAppointments] = useState<any[]>([]);
+  // Sell Plan Dialog state
+  const [sellPlanDialogOpen, setSellPlanDialogOpen] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
 
   const fullName = `${item.customer.firstName || ""} ${item.customer.lastName || ""}`.trim() || "Unknown Patient";
   const initials = fullName
@@ -97,13 +104,13 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
   }
 
-  // Fetch prescriptions from backend
+  // Fetch prescriptions from backend - get ALL prescriptions for this customer
   useEffect(() => {
     const fetchPrescriptions = async () => {
-      if (!item.customer.id || !item.appointments[0]?.id) return;
+      if (!item.customer.id) return;
       try {
         const res = await axiosInstance.get(
-          `/prescriptions?customerId=${item.customer.id}&appointmentId=${item.appointments[0].id}`
+          `/prescriptions?customerId=${item.customer.id}`
         );
         setPrescriptionPhotos(res.data.prescriptions || []);
       } catch (err) {
@@ -111,7 +118,24 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
       }
     };
     fetchPrescriptions();
-  }, [item.customer.id, item.appointments]);
+  }, [item.customer.id]);
+
+  // Fetch ALL appointments for this customer
+  useEffect(() => {
+    const fetchAllAppointments = async () => {
+      if (!item.customer.id) return;
+      try {
+        const res = await axiosInstance.get(
+          `/appointments?customerId=${item.customer.id}`
+        );
+        setAllAppointments(res.data.data || []);
+      } catch (err) {
+        console.error('Failed to fetch appointments:', err);
+        setAllAppointments([]);
+      }
+    };
+    fetchAllAppointments();
+  }, [item.customer.id]);
 
   // Handle prescription photo upload/capture
   const handlePrescriptionPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,9 +154,9 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      // Refresh prescription list
+      // Refresh prescription list - get all prescriptions for customer
       const res = await axiosInstance.get(
-        `/prescriptions?customerId=${item.customer.id}&appointmentId=${item.appointments[0].id}`
+        `/prescriptions?customerId=${item.customer.id}`
       );
       setPrescriptionPhotos(res.data.prescriptions || []);
     } catch (err) {
@@ -147,7 +171,6 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     if (appointment.status === "CANCELLED") return "Cancelled";
     if (appointment.status === "COMPLETED") return "Completed";
     
-    // Calculate automatic status based on time
     const autoStatus = getDefaultStatus(appointment.startAt);
     return autoStatus;
   };
@@ -161,9 +184,21 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     if (statusLower === "waiting") return "bg-yellow-100 text-yellow-700 border-yellow-300";
     return "bg-gray-100 text-gray-700 border-gray-300";
   };
-
-  const futureVisits = item.appointments.filter((apt) => apt.startAt && utcToIst(apt.startAt) > new Date());
-  const pastVisits = item.appointments.filter((apt) => apt.startAt && utcToIst(apt.startAt) <= new Date());
+  
+  const now = new Date();
+  
+  const pastVisits = allAppointments.filter((apt) => {
+    if (!apt.startAt) return false;
+    const appointmentDate = utcToIst(apt.startAt);
+    console.log('Checking appointment:', apt.id, 'startAt:', apt.startAt, 'converted:', appointmentDate, 'isPast:', appointmentDate < now);
+    return appointmentDate < now;
+  });
+  
+  const futureVisits = allAppointments.filter((apt) => {
+    if (!apt.startAt) return false;
+    const appointmentDate = utcToIst(apt.startAt);
+    return appointmentDate >= now;
+  });
 
   // Calculate package details
   const packageDetails = {
@@ -265,13 +300,24 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                     </Button>
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-3 flex-1">
+                <div className="flex gap-3">
                   {prescriptionPhotos.length > 0 ? (
                     <>
-                      {prescriptionPhotos.slice(0, 2).map((photo) => (
+                      {[...prescriptionPhotos]
+                        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+                        .slice(0, 2)
+                        .map((photo, idx) => (
                         <div
                           key={photo.id}
-                          className="aspect-video bg-gray-100 rounded-lg border border-gray-300 overflow-hidden"
+                          className="w-[92px] h-[92px] bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => {
+                            const sortedPhotos = [...prescriptionPhotos].sort(
+                              (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+                            );
+                            const actualIndex = sortedPhotos.findIndex(p => p.id === photo.id);
+                            setCurrentImageIndex(actualIndex);
+                            setLightboxOpen(true);
+                          }}
                         >
                           <img
                             src={photo.imageUrl}
@@ -280,21 +326,9 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                           />
                         </div>
                       ))}
-                      {prescriptionPhotos.length > 2 && (
-                        <div className="aspect-video bg-blue-50 rounded-lg border-blue-300 overflow-hidden flex items-center justify-center">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">
-                              +{prescriptionPhotos.length - 2}
-                            </div>
-                            <div className="text-xs text-blue-600 font-medium">
-                              more
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </>
                   ) : (
-                    <div className="col-span-2 flex items-center justify-center text-gray-400 text-sm h-full min-h-[100px]">
+                    <div className="flex items-center justify-center text-gray-400 text-sm h-[92px] flex-1">
                       No photos added yet
                     </div>
                   )}
@@ -324,9 +358,21 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                   Sessions Used ({packageDetails.usedSessions} Total)
                 </p>
               </div>
-              <Button className="w-full text-xs bg-gradient-to-r from-[#75B640] to-[#52813C] text-white">
+              <Button
+                className="w-full text-xs bg-gradient-to-r from-[#75B640] to-[#52813C] text-white"
+                onClick={() => setSellPlanDialogOpen(true)}
+              >
                 Sell New Plan
               </Button>
+              <SellPlanDialog
+                open={sellPlanDialogOpen}
+                onClose={() => setSellPlanDialogOpen(false)}
+                onSelect={pkg => {
+                  setSelectedPackage(pkg);
+                  setSellPlanDialogOpen(false);
+                  // You can add further logic here to proceed with selling the selected package
+                }}
+              />
             </CardContent>
           </Card>
         </div>
@@ -399,6 +445,12 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Status</th>
                         </tr>
                       </thead>
+                    </table>
+                    <div className="max-h-[175px] overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      <style>{`
+                        div::-webkit-scrollbar { display: none; }
+                      `}</style>
+                      <table className="w-full">
                       <tbody className="bg-white">
                         {futureVisits.length > 0 ? (
                           futureVisits.map((appointment) => {
@@ -425,6 +477,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                         )}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -443,6 +496,12 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Status</th>
                         </tr>
                       </thead>
+                    </table>
+                    <div className="max-h-[175px] overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      <style>{`
+                        div::-webkit-scrollbar { display: none; }
+                      `}</style>
+                      <table className="w-full">
                       <tbody className="bg-white">
                         {pastVisits.length > 0 ? (
                           pastVisits.map((appointment) => {
@@ -469,6 +528,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                         )}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -507,6 +567,173 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
         customer={item.customer}
         onSave={() => {}}
       />
+
+      {/* Prescription Photos Lightbox */}
+      {lightboxOpen && prescriptionPhotos.length > 0 && (() => {
+        const sortedPhotos = [...prescriptionPhotos].sort(
+          (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
+        const currentPhoto = sortedPhotos[currentImageIndex];
+        
+        const handlePrev = () => {
+          setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : sortedPhotos.length - 1));
+        };
+        
+        const handleNext = () => {
+          setCurrentImageIndex((prev) => (prev < sortedPhotos.length - 1 ? prev + 1 : 0));
+        };
+
+        const formatDate = (dateString: string) => {
+          if (!dateString) return 'Date not available';
+          
+          console.log('Formatting date:', dateString);
+          
+          try {
+            // Try parsing the date
+            let date = new Date(dateString);
+            
+            // If invalid, try with UTC timezone
+            if (isNaN(date.getTime())) {
+              date = new Date(dateString + 'Z');
+            }
+            
+            // If still invalid
+            if (isNaN(date.getTime())) {
+              console.error('Invalid date:', dateString);
+              return 'Date not available';
+            }
+            
+            console.log('Parsed date:', date);
+            
+            return date.toLocaleString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+            });
+          } catch (error) {
+            console.error('Date formatting error:', error, dateString);
+            return 'Date not available';
+          }
+        };
+
+        const handleDelete = async () => {
+          if (!confirm('Are you sure you want to delete this prescription?')) return;
+          
+          try {
+            await axiosInstance.delete(`/prescriptions?id=${currentPhoto.id}`);
+            
+            // Remove from local state
+            const updatedPhotos = prescriptionPhotos.filter(p => p.id !== currentPhoto.id);
+            setPrescriptionPhotos(updatedPhotos);
+            
+            // If no more photos, close lightbox
+            if (updatedPhotos.length === 0) {
+              setLightboxOpen(false);
+            } else {
+              // Adjust index if needed
+              if (currentImageIndex >= updatedPhotos.length) {
+                setCurrentImageIndex(updatedPhotos.length - 1);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to delete prescription:', error);
+            alert('Failed to delete prescription');
+          }
+        };
+
+        return (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}
+            onClick={() => setLightboxOpen(false)}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setLightboxOpen(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 text-4xl font-bold z-10 w-12 h-12 flex items-center justify-center"
+            >
+              ×
+            </button>
+
+            {/* Delete button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              className="absolute top-4 right-20 text-white hover:text-red-400 z-10 w-12 h-12 flex items-center justify-center transition-colors"
+              title="Delete prescription"
+            >
+              <Trash2 className="w-6 h-6" />
+            </button>
+
+            {/* Left arrow */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              className="absolute top-4 right-20 text-white hover:text-red-400 z-10 w-12 h-12 flex items-center justify-center transition-colors"
+              title="Delete prescription"
+            >
+              <Trash2 className="w-6 h-6" />
+            </button>
+
+            {/* Left arrow */}
+            {sortedPhotos.length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrev();
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 text-5xl font-bold z-10 w-16 h-16 flex items-center justify-center"
+              >
+                ‹
+              </button>
+            )}
+
+            {sortedPhotos.length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNext();
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 text-5xl font-bold z-10 w-16 h-16 flex items-center justify-center"
+              >
+                ›
+              </button>
+            )}
+            <div 
+              className="flex flex-col items-center"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '95vw', maxHeight: '95vh' }}
+            >
+              <img
+                src={currentPhoto.imageUrl}
+                alt="Prescription"
+                className="object-contain"
+                style={{ maxWidth: '95vw', maxHeight: '85vh', width: 'auto', height: 'auto' }}
+                onError={(e) => {
+                  console.error('Image failed to load:', currentPhoto.imageUrl);
+                  e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" fill="white" font-size="16">Image not available</text></svg>';
+                }}
+                onLoad={() => console.log('Image loaded:', currentPhoto.imageUrl)}
+              />
+              <div className="mt-4 text-white text-center">
+                <div className="text-lg font-medium">
+                  {formatDate(currentPhoto.uploadedAt)}
+                </div>
+                <div className="text-sm text-gray-300 mt-1">
+                  {currentImageIndex + 1} / {sortedPhotos.length}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

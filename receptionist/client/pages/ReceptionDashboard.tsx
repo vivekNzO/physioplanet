@@ -138,7 +138,7 @@ export default function ReceptionDashboard() {
           }
           customerMap.set(customerId, {
             id: customerId,
-            ticketNo: apt.id.slice(0, 5).toUpperCase(),
+            ticketNo: apt.id.slice(-5).toUpperCase(),
             customer: apt.customer,
             appointments: [apt], // Always include the current appointment for status updates
             queueStatus,
@@ -238,7 +238,7 @@ export default function ReceptionDashboard() {
       // Transform customers to QueueItem format
       const queueItems = searchResults.map((customer: any) => ({
         id: customer.id,
-        ticketNo: customer.id.slice(0, 5).toUpperCase(),
+        ticketNo: customer.id.slice(-5).toUpperCase(),
         customer,
         appointments: [], // Will be loaded on selection
         queueStatus: PatientQueueStatus.WAITING, // Default status for search results

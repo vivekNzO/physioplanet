@@ -82,7 +82,6 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
       if (onStatusChange) {
         onStatusChange(item.id, newStatus as PatientQueueStatus);
       }
-      
       toast.success(`Status updated to ${getStatusText(newStatus as PatientQueueStatus)}`);
     } catch (error: any) {
       console.error('Error updating status:', error);
