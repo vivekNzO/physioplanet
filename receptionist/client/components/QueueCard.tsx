@@ -19,6 +19,7 @@ export interface Customer {
   lastName?: string | null;
   phone?: string | null;
   email?: string | null;
+  photoUrl?: string | null;
   metadata?: any;
 }
 
@@ -139,12 +140,15 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
     .toUpperCase()
     .slice(0, 2);
 
-  let avatarUrl = item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
+  const getFullPhotoUrl = (photoUrl: string | null | undefined) => {
+    if (!photoUrl) return null;
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    return `${apiBase}/api${photoUrl}`;
+  };
+
+  const avatarUrl = getFullPhotoUrl(item.customer.photoUrl) || item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
   
-  if (!avatarUrl && item.customer.metadata?.photo?.data) {
-    const photoMeta = item.customer.metadata.photo;
-    avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
-  }
+  console.log('[QueueCard] Customer:', item.customer.firstName, 'photoUrl:', item.customer.photoUrl, 'avatarUrl:', avatarUrl);
   
   const isWalkIn = item.appointments && item.appointments[0]?.appointmentType === 'WALKIN';
 

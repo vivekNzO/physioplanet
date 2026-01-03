@@ -64,8 +64,9 @@ export default function VerifyOTP() {
         } else {
           toast.error(res.data.error || 'Invalid OTP');
         }
-      } catch (err) {
-        toast.error('Failed to verify OTP');
+      } catch (err: any) {
+        const errorMessage = err?.response?.data?.error || 'Failed to verify OTP';
+        toast.error(errorMessage);
       }
     }
   };

@@ -25,11 +25,10 @@ function WelcomePage() {
           params: { phone: mobileNumber, limit: 1 },
         });
         const customer = res?.data?.data?.[0];
-        const photo = customer?.metadata?.photo;
-        if (photo?.data) {
-          const type = photo.type || 'image/png';
-          const dataUrl = `data:${type};base64,${photo.data}`;
-          if (active) setPhotoUrl(dataUrl);
+        if (customer?.photoUrl) {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+          const fullPhotoUrl = `${apiBase}/api${customer.photoUrl}`;
+          if (active) setPhotoUrl(fullPhotoUrl);
         } else if (active) {
           setPhotoUrl(fallbackPhoto);
         }

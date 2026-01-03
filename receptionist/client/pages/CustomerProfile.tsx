@@ -23,6 +23,7 @@ interface CustomerData {
   city?: string
   state?: string
   zipCode?: string
+  photoUrl?: string | null
   metadata?: {
     photo?: {
       name: string
@@ -63,6 +64,13 @@ export default function CustomerProfile() {
   const [editFormData, setEditFormData] = useState<Partial<CustomerData>>({})
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+
+  // Helper to get full photo URL
+  const getPhotoUrl = (photoUrl: string | null | undefined) => {
+    if (!photoUrl) return null;
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    return `${apiBase}/api${photoUrl}`;
+  };
 
   useEffect(() => {
     if (!customerId) {
@@ -122,8 +130,8 @@ export default function CustomerProfile() {
         notes: customer.notes,
       })
       setPhotoPreview(
-        customer.metadata?.photo?.data
-          ? `data:${customer.metadata.photo.type};base64,${customer.metadata.photo.data}`
+        customer.photoUrl 
+          ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api${customer.photoUrl}`
           : null
       )
       setPhotoFile(null)
@@ -251,9 +259,9 @@ export default function CustomerProfile() {
             {/* Profile Card */}
             <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
               <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 mb-4 flex items-center justify-center overflow-hidden">
-                {customer.metadata?.photo?.data ? (
+                {customer.photoUrl ? (
                   <img
-                    src={`data:${customer.metadata.photo.type};base64,${customer.metadata.photo.data}`}
+                    src={getPhotoUrl(customer.photoUrl)}
                     alt={fullName}
                     className="w-full h-full object-cover"
                   />

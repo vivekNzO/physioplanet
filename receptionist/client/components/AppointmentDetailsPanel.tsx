@@ -5,6 +5,7 @@ import GeneralInformationDialog from "./dialogs/GeneralInformationDialog";
 import ClientLastFeedbackDialog from "./dialogs/ClientLastFeedbackDialog";
 import { Pencil, Trash2 } from "lucide-react";
 import { getDefaultStatus } from "@/utils/statusHelper";
+import toast from "react-hot-toast";
 
 export enum PatientQueueStatus {
   IN_EXERCISE = "IN_EXERCISE",
@@ -23,6 +24,7 @@ export interface Customer {
   gender?: string | null;
   dateOfBirth?: string | null;
   notes?: string | null;
+  photoUrl?: string | null;
   metadata?: any;
 }
 
@@ -94,15 +96,18 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     .toUpperCase()
     .slice(0, 2);
 
-  // Get avatar URL from metadata if present
-  // Check for direct URL first (avatar/profileImage)
-  let avatarUrl = item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
+  const getFullPhotoUrl = (photoUrl: string | null | undefined) => {
+    if (!photoUrl) return null;
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    return `${apiBase}/api${photoUrl}`;
+  };
+
+  // Get avatar URL - check photoUrl first, then fallback to metadata
+  const avatarUrl = getFullPhotoUrl(item.customer.photoUrl) || item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
   
-  // If not found, check for base64 photo data
-  if (!avatarUrl && item.customer.metadata?.photo?.data) {
-    const photoMeta = item.customer.metadata.photo;
-    avatarUrl = `data:${photoMeta.type || 'image/jpeg'};base64,${photoMeta.data}`;
-  }
+  console.log('Customer:', item.customer.firstName, item.customer.lastName);
+  console.log('photoUrl from DB:', item.customer.photoUrl);
+  console.log('Constructed avatarUrl:', avatarUrl);
 
   // Fetch prescriptions from backend - get ALL prescriptions for this customer
   useEffect(() => {
@@ -309,21 +314,40 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                         .map((photo, idx) => (
                         <div
                           key={photo.id}
-                          className="w-[92px] h-[92px] bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => {
-                            const sortedPhotos = [...prescriptionPhotos].sort(
-                              (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-                            );
-                            const actualIndex = sortedPhotos.findIndex(p => p.id === photo.id);
-                            setCurrentImageIndex(actualIndex);
-                            setLightboxOpen(true);
-                          }}
+                          className="relative w-[92px] h-[92px] bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex-shrink-0"
                         >
                           <img
-                            src={photo.imageUrl}
+                            src={getFullPhotoUrl(photo.imageUrl)}
                             alt="Prescription"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => {
+                              const sortedPhotos = [...prescriptionPhotos].sort(
+                                (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+                              );
+                              const actualIndex = sortedPhotos.findIndex(p => p.id === photo.id);
+                              setCurrentImageIndex(actualIndex);
+                              setLightboxOpen(true);
+                            }}
                           />
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm('Are you sure you want to delete this prescription?')) return;
+                              
+                              try {
+                                await axiosInstance.delete(`/prescriptions?id=${photo.id}`);
+                                setPrescriptionPhotos(prescriptionPhotos.filter(p => p.id !== photo.id));
+                                toast.success('Prescription deleted successfully');
+                              } catch (error) {
+                                console.error('Failed to delete prescription:', error);
+                                toast.error('Failed to delete prescription');
+                              }
+                            }}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors"
+                            title="Delete prescription"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       ))}
                     </>
@@ -712,7 +736,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
               style={{ maxWidth: '95vw', maxHeight: '95vh' }}
             >
               <img
-                src={currentPhoto.imageUrl}
+                src={getFullPhotoUrl(currentPhoto.imageUrl)}
                 alt="Prescription"
                 className="object-contain"
                 style={{ maxWidth: '95vw', maxHeight: '85vh', width: 'auto', height: 'auto' }}

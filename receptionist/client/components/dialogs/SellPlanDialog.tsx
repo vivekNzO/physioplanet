@@ -80,7 +80,7 @@ export default function SellPlanDialog({ open, onClose, onSelect }: SellPlanDial
         {!showPayment ? (
           <>
             <h2 className="text-4xl text-center mb-6">
-              Package <span className="text-[#1D5287]">Details</span>
+              Package <span className="text-[#1D5287] font-bold">Details</span>
             </h2>
             {loading ? (
               <div className="text-center py-8"><PackageSkeleton /></div>

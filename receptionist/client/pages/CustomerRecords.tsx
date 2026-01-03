@@ -28,6 +28,7 @@ interface Customer {
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
+  photoUrl?: string | null;
 }
 
 interface Appointment {

@@ -26,6 +26,7 @@ interface Customer {
   phone?: string | null;
   dateOfBirth?: string | null;
   gender?: string | null;
+  photoUrl?: string | null;
 }
 
 interface BookNewAppointmentDialogProps {
@@ -323,22 +324,30 @@ export default function BookNewAppointmentDialog({
       let customerId = formData.customerId;
 
       if (formData.isNewCustomer) {
-        // Create new customer
-        const customerData: any = {
-          phone: formData.customer.phone,
-          firstName: formData.customer.firstName,
-          gender: formData.customer.gender,
-          metadata: {
-            age: formData.customer.age,
+        // Create new customer with photo support
+        const customerFormData = new FormData();
+        customerFormData.append('phone', formData.customer.phone);
+        customerFormData.append('firstName', formData.customer.firstName);
+        customerFormData.append('gender', formData.customer.gender);
+        
+        // Add photo if selected
+        if (selectedFile) {
+          customerFormData.append('photo', selectedFile);
+        }
+        
+        // Add metadata as JSON string (backend will handle it)
+        // Or store age in notes/separate field if needed
+        const response = await axiosInstance.post("/customers", customerFormData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
           },
-        };
-        const response = await axiosInstance.post("/customers", customerData);
+        });
         customerId = response.data.data.id;
       }
 
       // Always create a walk-in appointment for this customer
       const appointmentData = {
-        staffId: null, // You may want to select/assign a staff member in the UI
+        staffId: null,
         serviceId: null,
         customerId,
         startAt: null,
