@@ -72,7 +72,7 @@ export default function ReceptionDashboard() {
 
       // Get today's date in IST
       const now = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000;
+      const istOffset = 0;
       const istNow = new Date(now.getTime() + istOffset);
       const istYear = istNow.getFullYear();
       const istMonth = istNow.getMonth();
@@ -283,7 +283,7 @@ export default function ReceptionDashboard() {
       {isInitialLoad ? (<QueuePageSkeleton/>):(
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Queue List */}
-        <div className="w-96 border-r bg-white border-gray-200 flex flex-col shadow-sm mr-[10px]">
+        <div className="max-w-96 w-full border-r bg-white border-gray-200 flex flex-col shadow-sm mr-[10px]">
           {/* Queue Header */}
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-2xl text-[#344256] font-normal mb-4">

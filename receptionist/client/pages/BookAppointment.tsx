@@ -476,7 +476,7 @@ function AppointmentsPageContent() {
       startAt: new Date(selectedSlot.startIso).toISOString(),
       endAt: new Date(selectedSlot.endIso).toISOString(),
       price: parseFloat(formData.price) || 0,
-      currency: "USD",
+      currency: "INR",
       status: "CONFIRMED",
       notes: formData.notes || null,
       customerNotes: formData.customerNotes || null,

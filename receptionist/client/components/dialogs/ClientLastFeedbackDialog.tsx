@@ -37,6 +37,12 @@ export default function ClientLastFeedbackDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [newFeedback, setNewFeedback] = useState("");
 
+  // Reset feedback state when customer or dialog open changes
+  useEffect(() => {
+    setNewFeedback("");
+    setIsAdding(false);
+  }, [customer.id, open]);
+
   const latestFeedback = feedbacks.length > 0 ? feedbacks[0] : null;
 
   // Fetch feedbacks when dialog opens

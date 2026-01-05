@@ -146,10 +146,7 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
     return `${apiBase}/api${photoUrl}`;
   };
 
-  const avatarUrl = getFullPhotoUrl(item.customer.photoUrl) || item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
-  
-  console.log('[QueueCard] Customer:', item.customer.firstName, 'photoUrl:', item.customer.photoUrl, 'avatarUrl:', avatarUrl);
-  
+  const avatarUrl = getFullPhotoUrl(item.customer.photoUrl) || item.customer.metadata?.avatar || item.customer.metadata?.profileImage;  
   const isWalkIn = item.appointments && item.appointments[0]?.appointmentType === 'WALKIN';
 
   return (

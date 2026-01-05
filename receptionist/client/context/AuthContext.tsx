@@ -45,7 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const fetchedTenantId = await fetchTenantByDomain();
       // Then fetch the session
       await refreshSession();
-      console.log('Auth initialized with tenantId:', fetchedTenantId);
     } catch (error) {
       console.error('Auth initialization error:', error);
       setUser(null);
@@ -60,14 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const currentDomain = window.location.port 
         ? `${window.location.hostname}:${window.location.port}` 
         : window.location.hostname;
-      console.log('Fetching tenant for domain:', currentDomain);
       const res = await axiosInstance.get(`/tenant/by-domain?domain=${currentDomain}`);
-      console.log('Tenant API response:', res.data);
       
       if (res.data?.success && res.data?.tenantId) {
         setTenantId(res.data.tenantId);
         localStorage.setItem('tenantId', res.data.tenantId);
-        console.log('Tenant ID set to:', res.data.tenantId);
         return res.data.tenantId;
       }
     } catch (error) {
@@ -75,13 +71,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fallback to localStorage if available
       const storedTenantId = localStorage.getItem('tenantId');
       if (storedTenantId) {
-        console.log('Using stored tenant ID:', storedTenantId);
         setTenantId(storedTenantId);
         return storedTenantId;
       }
     }
     const fallbackTenantId = 'cmi7et46x0000pj2zmdsp82rm';
-    console.log('Using fallback tenant ID:', fallbackTenantId);
     setTenantId(fallbackTenantId);
     localStorage.setItem('tenantId', fallbackTenantId);
     return fallbackTenantId;

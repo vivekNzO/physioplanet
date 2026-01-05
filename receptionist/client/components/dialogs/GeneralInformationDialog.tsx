@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,19 @@ export default function GeneralInformationDialog({
     bloodGroup: customer.metadata?.bloodGroup || "",
     address: customer.metadata?.address || "",
   });
+
+  // Reset form state when customer or dialog open changes
+  useEffect(() => {
+    setFormData({
+      gender: customer.gender || "",
+      dateOfBirth: customer.dateOfBirth || "",
+      age: customer.metadata?.age || "",
+      weight: customer.metadata?.weight || "",
+      bloodGroup: customer.metadata?.bloodGroup || "",
+      address: customer.metadata?.address || "",
+    });
+    setIsEditing(false);
+  }, [customer.id, open]);
 
   const handleSave = async () => {
     setIsSaving(true);

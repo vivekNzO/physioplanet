@@ -71,12 +71,17 @@ import { Phone, Mail, Plus, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { utcToIst } from "@/utils/dateUtils";
 import SellPlanDialog from "./dialogs/SellPlanDialog";
+import { useAuth } from "../context/AuthContext";
+import SellPlanDialog2 from "./dialogs/SellPlanDialog2";
+import PaymentHistoryDialog from "./dialogs/PaymentHistoryDialog";
 
 interface AppointmentDetailsPanelProps {
   item: QueueItem;
 }
 
 export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPanelProps) {
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const { tenantId } = useAuth();
   const [generalInfoOpen, setGeneralInfoOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [prescriptionPhotos, setPrescriptionPhotos] = useState<{ id: string; imageUrl: string; uploadedAt: string }[]>([]);
@@ -104,10 +109,6 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
 
   // Get avatar URL - check photoUrl first, then fallback to metadata
   const avatarUrl = getFullPhotoUrl(item.customer.photoUrl) || item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
-  
-  console.log('Customer:', item.customer.firstName, item.customer.lastName);
-  console.log('photoUrl from DB:', item.customer.photoUrl);
-  console.log('Constructed avatarUrl:', avatarUrl);
 
   // Fetch prescriptions from backend - get ALL prescriptions for this customer
   useEffect(() => {
@@ -195,7 +196,6 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
   const pastVisits = allAppointments.filter((apt) => {
     if (!apt.startAt) return false;
     const appointmentDate = utcToIst(apt.startAt);
-    console.log('Checking appointment:', apt.id, 'startAt:', apt.startAt, 'converted:', appointmentDate, 'isPast:', appointmentDate < now);
     return appointmentDate < now;
   });
   
@@ -205,12 +205,20 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
     return appointmentDate >= now;
   });
 
-  // Calculate package details
-  const packageDetails = {
-    name: "Rehab Package for 1 Month",
-    totalSessions: 30,
-    usedSessions: 21,
-  };
+  // Fetch most recent package bought by the customer
+  const [recentPackage, setRecentPackage] = useState<{ name: string; totalSessions?: number; usedSessions?: number } | null>(null);
+  useEffect(() => {
+    if (!item.customer.id) return;
+    axiosInstance.get(`/purchase/latest-package?customerId=${item.customer.id}`)
+      .then(res => {
+        if (res.data && res.data.success && res.data.data) {
+          setRecentPackage(res.data.data);
+        } else {
+          setRecentPackage(null);
+        }
+      })
+      .catch(() => setRecentPackage(null));
+  }, [item.customer.id]);
 
 
 
@@ -250,9 +258,6 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
 
         {/* Tab Buttons */}
         <div className="flex gap-5">
-          <Button variant="outline" className="text-xs font-medium">
-            Analytics
-          </Button>
           <Button 
             variant="outline" 
             className="text-xs font-medium"
@@ -370,17 +375,13 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
 
         {/* Plans Details Section */}
         <div className="flex-1 basis-[30%]">
-          <Card className="border-gray-200 p-5 h-full">
+          <Card className="border-gray-200 p-5 h-full flex flex-col justify-between">
            <h3 className="text-[18px] font-normal mb-[25px]">
                 Plan <span className="text-[#1D5287] font-bold">Details</span>
             </h3>
             <CardContent className="p-0 bg-white">
               <div className="mb-6">
-                <h4 className="text-sm font-medium mb-2">{packageDetails.name}</h4>
-                <div className="text-[32px] font-semibold text-[#1D5287] mb-2">{packageDetails.totalSessions}</div>
-                <p className="text-xs font-medium text-[#101111]">
-                  Sessions Used ({packageDetails.usedSessions} Total)
-                </p>
+                <h4 className="text-sm font-medium mb-2">{recentPackage ? recentPackage.name : "No package purchased yet"}</h4>
               </div>
               <Button
                 className="w-full text-xs bg-gradient-to-r from-[#75B640] to-[#52813C] text-white"
@@ -394,9 +395,21 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                 onSelect={pkg => {
                   setSelectedPackage(pkg);
                   setSellPlanDialogOpen(false);
+                }}
+                tenantId={tenantId || ""}
+                customerId={item.customer.id}
+                appointmentId={item.appointments[0]?.id || null}
+                currency={item.appointments[0]?.currency || "INR"}
+              />
+              {/* <SellPlanDialog2
+                open={sellPlanDialogOpen}
+                onClose={() => setSellPlanDialogOpen(false)}
+                onSelect={pkg => {
+                  setSelectedPackage(pkg);
+                  setSellPlanDialogOpen(false);
                   // You can add further logic here to proceed with selling the selected package
                 }}
-              />
+              /> */}
             </CardContent>
           </Card>
         </div>
@@ -409,7 +422,9 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
             </h3>
             <CardContent className="p-0 bg-white">
               <div className="mb-6">
-                <h4 className="text-xs font-medium mb-[14px]">{packageDetails.name}</h4>
+                <h4 className="text-xs font-medium mb-[14px]">
+                  {recentPackage ? recentPackage.name : "No package purchased yet"}
+                </h4>
                 <div className="space-y-2 mb-6">
                   <div className="flex justify-between items-center text-[18px] font-semibold">
                     <span className="text-red-600 font-semibold">₹{item.totalAmount.toLocaleString()}.00 PAID</span>
@@ -423,9 +438,14 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                 <Button className="w-full bg-gradient-to-r from-[#75B640] to-[#52813C] text-white text-xs font-medium">
                   Record Payment
                 </Button>
-                <Button variant="outline" className="w-full text-xs font-medium">
+                <Button variant="outline" className="w-full text-xs font-medium" onClick={() => setPaymentDialogOpen(true)}>
                   View Past Payment
                 </Button>
+                <PaymentHistoryDialog
+                  open={paymentDialogOpen}
+                  onClose={() => setPaymentDialogOpen(false)}
+                  customerId={item.customer.id}
+                />
               </div>
             </CardContent>
           </Card>
@@ -608,10 +628,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
         };
 
         const formatDate = (dateString: string) => {
-          if (!dateString) return 'Date not available';
-          
-          console.log('Formatting date:', dateString);
-          
+          if (!dateString) return 'Date not available';          
           try {
             // Try parsing the date
             let date = new Date(dateString);
@@ -626,9 +643,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
               console.error('Invalid date:', dateString);
               return 'Date not available';
             }
-            
-            console.log('Parsed date:', date);
-            
+                      
             return date.toLocaleString('en-IN', {
               day: '2-digit',
               month: 'short',
@@ -739,12 +754,10 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                 src={getFullPhotoUrl(currentPhoto.imageUrl)}
                 alt="Prescription"
                 className="object-contain"
-                style={{ maxWidth: '95vw', maxHeight: '85vh', width: 'auto', height: 'auto' }}
+                style={{ maxWidth: '95vw', maxHeight: '100vh', width: 'full', height: 'full' }}
                 onError={(e) => {
-                  console.error('Image failed to load:', currentPhoto.imageUrl);
                   e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" fill="white" font-size="16">Image not available</text></svg>';
                 }}
-                onLoad={() => console.log('Image loaded:', currentPhoto.imageUrl)}
               />
               <div className="mt-4 text-white text-center">
                 <div className="text-lg font-medium">
