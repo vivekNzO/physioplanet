@@ -14,6 +14,75 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Function to convert payments to CSV format
+  const convertToCSV = (data: any[]) => {
+    if (data.length === 0) return '';
+
+    // CSV Headers
+    const headers = ['Date', 'Amount', 'Mode', 'Items', 'Status'];
+    
+    // CSV Rows
+    const rows = data.map((payment) => {
+      // Extract items from purchases
+      const items: string[] = [];
+      if (payment.purchases && payment.purchases.length > 0) {
+        payment.purchases.forEach((purchase: any) => {
+          if (purchase.details && purchase.details.length > 0) {
+            purchase.details.forEach((detail: any) => {
+              if (detail.itemName) {
+                items.push(detail.itemName);
+              }
+            });
+          }
+        });
+      }
+      
+      const date = payment.createdAt ? new Date(payment.createdAt).toLocaleString() : 'N/A';
+      const amount = `₹${payment.amount?.toLocaleString() || 0}`;
+      const mode = payment.mode || 'N/A';
+      const itemsStr = items.length > 0 ? items.join('; ') : 'No items';
+      const status = payment.status || 'N/A';
+      
+      // Escape commas and quotes in CSV
+      const escapeCSV = (str: string) => {
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+      
+      return [
+        escapeCSV(date),
+        escapeCSV(amount),
+        escapeCSV(mode),
+        escapeCSV(itemsStr),
+        escapeCSV(status)
+      ].join(',');
+    });
+    
+    // Combine headers and rows
+    return [headers.join(','), ...rows].join('\n');
+  };
+
+  // Function to download CSV
+  const handleExportCSV = () => {
+    if (payments.length === 0) {
+      return;
+    }
+    
+    const csvContent = convertToCSV(payments);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `payment_history_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     if (!open || !customerId) return;
     setLoading(true);
@@ -110,7 +179,22 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
             </table>
           </div>
         )}
-        <Button onClick={onClose} className="mt-4 bg-gradient-to-r from-[#75B640] to-[#52813C] text-white">Close</Button>
+        <div className="flex gap-3 mt-4">
+          <Button 
+            onClick={handleExportCSV} 
+            disabled={payments.length === 0 || loading}
+            variant="outline"
+            className="flex-1 border-[#75B640] text-[#75B640] hover:bg-[#75B640] hover:text-white"
+          >
+            Export CSV
+          </Button>
+          <Button 
+            onClick={onClose} 
+            className="flex-1 bg-gradient-to-r from-[#75B640] to-[#52813C] text-white"
+          >
+            Close
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
