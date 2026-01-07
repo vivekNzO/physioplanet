@@ -37,25 +37,42 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
         });
       }
       
-      const date = payment.createdAt ? new Date(payment.createdAt).toLocaleString() : 'N/A';
-      const amount = `₹${payment.amount?.toLocaleString() || 0}`;
+      // Format date in a way Excel can recognize (MM/DD/YYYY HH:MM:SS AM/PM)
+      const formatDateForCSV = (dateString: string) => {
+        const date = new Date(dateString);
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours24 = date.getHours();
+        const hours12 = hours24 % 12 || 12;
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        const ampm = hours24 >= 12 ? 'PM' : 'AM';
+        return `${month}/${day}/${year} ${hours12}:${minutes}:${seconds} ${ampm}`;
+      };
+      const date = payment.createdAt ? formatDateForCSV(payment.createdAt) : 'N/A';
+      // Format amount as plain number (convert Decimal to number, remove any formatting)
+      const amountValue = payment.amount ? (typeof payment.amount === 'string' ? parseFloat(payment.amount) : Number(payment.amount)) : 0;
+      const amount = amountValue.toFixed(2); // Format to 2 decimal places
       const mode = payment.mode || 'N/A';
       const itemsStr = items.length > 0 ? items.join('; ') : 'No items';
       const status = payment.status || 'N/A';
       
       // Escape commas and quotes in CSV
-      const escapeCSV = (str: string) => {
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-          return `"${str.replace(/"/g, '""')}"`;
+      const escapeCSV = (str: string, alwaysQuote: boolean = false) => {
+        const strValue = String(str);
+        // Always quote if it contains commas, quotes, newlines, or spaces (for dates)
+        if (alwaysQuote || strValue.includes(',') || strValue.includes('"') || strValue.includes('\n') || strValue.includes(' ')) {
+          return `"${strValue.replace(/"/g, '""')}"`;
         }
-        return str;
+        return strValue;
       };
       
       return [
-        escapeCSV(date),
+        escapeCSV(date, true), // Always quote dates since they contain spaces
         escapeCSV(amount),
         escapeCSV(mode),
-        escapeCSV(itemsStr),
+        escapeCSV(itemsStr, true), // Always quote items since they may contain spaces and semicolons
         escapeCSV(status)
       ].join(',');
     });
@@ -71,7 +88,9 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
     }
     
     const csvContent = convertToCSV(payments);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Add UTF-8 BOM for better Excel compatibility
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     
@@ -188,12 +207,7 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
           >
             Export CSV
           </Button>
-          <Button 
-            onClick={onClose} 
-            className="flex-1 bg-gradient-to-r from-[#75B640] to-[#52813C] text-white"
-          >
-            Close
-          </Button>
+
         </div>
       </DialogContent>
     </Dialog>

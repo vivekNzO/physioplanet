@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface Package {
   id: string;
@@ -40,7 +41,8 @@ interface RecordPaymentDialogProps {
   isEditingTotal?: boolean;
   onEditTotal?: (editing: boolean) => void;
   paying?: boolean;
-  showLineThrough?: boolean; 
+  showLineThrough?: boolean;
+  pendingAmount?: number; // Maximum amount that can be paid
 }
 
 export default function RecordPaymentDialog({ 
@@ -56,7 +58,8 @@ export default function RecordPaymentDialog({
   isEditingTotal = false,
   onEditTotal,
   paying = false,
-  showLineThrough = false
+  showLineThrough = false,
+  pendingAmount
 }: RecordPaymentDialogProps) {
   const [amount, setAmount] = useState(defaultAmount);
   const [method, setMethod] = useState<'cash' | 'online'>('cash');
@@ -174,11 +177,27 @@ export default function RecordPaymentDialog({
         {/* Pay Button */}
         <Button 
           className="w-full bg-gradient-to-r from-[#75B640] to-[#52813C] text-white font-semibold py-[18px] text-lg" 
-          onClick={() => onPay(amount, method)}
+          onClick={() => {
+            const paymentAmount = customTotal !== null ? customTotal : totalCalculated;
+            
+            // Validate that payment doesn't exceed pending amount
+            if (pendingAmount !== undefined) {
+              if (pendingAmount === 0 && paymentAmount > 0) {
+                toast.error('No pending amount. Payment cannot be recorded.');
+                return;
+              }
+              if (pendingAmount > 0 && paymentAmount > pendingAmount) {
+                toast.error(`Payment amount (₹${paymentAmount.toLocaleString()}) cannot exceed pending amount (₹${pendingAmount.toLocaleString()})`);
+                return;
+              }
+            }
+            
+            onPay(paymentAmount, method);
+          }}
           disabled={paying}
         >
           <span className="text-base font-semibold">
-            {paying ? 'Processing Payment...' : 'PAYMENT NOW'}
+            {paying ? 'Processing Payment...' : 'PAY NOW'}
           </span>
         </Button>
       </DialogContent>

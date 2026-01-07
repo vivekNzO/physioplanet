@@ -4,7 +4,7 @@ import axiosInstance from "@/lib/axios";
 import GeneralInformationDialog from "./dialogs/GeneralInformationDialog";
 import ClientLastFeedbackDialog from "./dialogs/ClientLastFeedbackDialog";
 import { Pencil, Trash2 } from "lucide-react";
-import { getDefaultStatus } from "@/utils/statusHelper";
+import { getStatusFromTimes } from "@/utils/statusHelper";
 import toast from "react-hot-toast";
 
 export enum PatientQueueStatus {
@@ -209,10 +209,11 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
 
   // Get automatic status based on time
   const getAppointmentStatus = (appointment: Appointment) => {
+    // If status is CANCELLED (manually set), return it
     if (appointment.status === "CANCELLED") return "Cancelled";
-    if (appointment.status === "COMPLETED") return "Completed";
     
-    const autoStatus = getDefaultStatus(appointment.startAt);
+    // Otherwise, determine status based on startAt and endAt times
+    const autoStatus = getStatusFromTimes(appointment.startAt, appointment.endAt);
     return autoStatus;
   };
 
@@ -815,6 +816,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
         isEditingTotal={isEditingTotal}
         onEditTotal={setIsEditingTotal}
         paying={recordingPayment}
+        pendingAmount={item.pendingAmount || 0}
       />
 
       {/* Manage Walk-in Appointment Dialog */}

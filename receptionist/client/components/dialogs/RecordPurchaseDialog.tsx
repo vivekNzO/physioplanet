@@ -213,7 +213,7 @@ export default function RecordPurchaseDialog({
               disabled={paying}
             >
               <span className="text-base font-semibold">
-                {paying ? 'Processing Payment...' : 'PAYMENT NOW'}
+                {paying ? 'Processing Payment...' : 'PAY NOW'}
               </span>
             </Button>
             <Button
@@ -226,7 +226,7 @@ export default function RecordPurchaseDialog({
               disabled={paying}
             >
               <span className="text-base font-semibold">
-                {paying ? 'Processing Payment...' : 'PAYMENT PARTIALLY'}
+                {paying ? 'Processing Payment...' : 'PAY PARTIALLY'}
               </span>
             </Button>
           </div>

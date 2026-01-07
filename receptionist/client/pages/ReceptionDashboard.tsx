@@ -11,7 +11,7 @@ import toast from "react-hot-toast";
 import Navbar from "@/components/NavBar";
 import QueuePageSkeleton from "@/skeletons/QueuePageSkeleton";
 import AppointmentDetailsSkeleton from "@/skeletons/AppointmentDetailsSkeleton";
-import { getDefaultStatus } from "@/utils/statusHelper";
+import { getStatusFromTimes } from "@/utils/statusHelper";
 import { getTodayRangeInUtc } from "@/utils/dateUtils";
 import BookNewAppointmentDialog from "@/components/dialogs/BookNewAppointmentDialog";
 
@@ -114,10 +114,12 @@ export default function ReceptionDashboard() {
             PatientQueueStatus.CANCELLED,
           ];
 
-          if (apt.status && allowedStatuses.includes(apt.status)) {
-            queueStatus = apt.status;
+          // If status is CANCELLED (manually set), keep it
+          if (apt.status === PatientQueueStatus.CANCELLED) {
+            queueStatus = PatientQueueStatus.CANCELLED;
           } else {
-            const autoStatus = getDefaultStatus(apt.startAt);
+            // Otherwise, determine status based on startAt and endAt times
+            const autoStatus = getStatusFromTimes(apt.startAt, apt.endAt);
             if (autoStatus === "Waiting") {
               queueStatus = PatientQueueStatus.WAITING;
             } else if (autoStatus === "In Exercise") {

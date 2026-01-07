@@ -10,7 +10,7 @@ import Navbar from "@/components/NavBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import CustomerRecordsSkeleton from "@/skeletons/CustomerRecordsSkeleton";
 import { useNavigate } from "react-router-dom";
-import { getDefaultStatus } from "@/utils/statusHelper";
+import { getStatusFromTimes } from "@/utils/statusHelper";
 import toast from "react-hot-toast";
 
 interface Staff {
@@ -172,12 +172,13 @@ function CustomerRecords() {
               })
             : "...................";
 
-          // Use dynamic status based on time
-          let status = getDefaultStatus(apt.startAt);
-          
+          // Use dynamic status based on startAt and endAt times
           // If it's cancelled in the backend, respect that
+          let status: string;
           if (apt.status === "CANCELLED") {
             status = "Cancelled";
+          } else {
+            status = getStatusFromTimes(apt.startAt, apt.endAt);
           }
 
           const paymentStatus =
@@ -235,9 +236,13 @@ function CustomerRecords() {
                 })
               : "...................";
             
-            let status = getDefaultStatus(apt.startAt);
+            // Use dynamic status based on startAt and endAt times
+            // If it's cancelled in the backend, respect that
+            let status: string;
             if (apt.status === "CANCELLED") {
               status = "Cancelled";
+            } else {
+              status = getStatusFromTimes(apt.startAt, apt.endAt);
             }
             
             const paymentStatus =
