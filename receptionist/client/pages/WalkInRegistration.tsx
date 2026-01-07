@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function WalkInRegistration() {
   const [fullName, setFullName] = useState('');
@@ -13,16 +14,35 @@ export default function WalkInRegistration() {
   const mobileNumber = location.state?.mobileNumber || '9988776655';
 
   const handleContinue = () => {
-    if (fullName) {
-      navigate('/patient-dashboard', {
-        state: {
-          mobileNumber,
-          name: fullName,
-          age,
-          gender
-        }
-      });
+    // Validation
+    if (!fullName.trim()) {
+      toast.error('Full Name is required');
+      return;
     }
+
+    const numericAge = parseInt(age, 10);
+    if (!age || Number.isNaN(numericAge)) {
+      toast.error('Age is required and must be a valid number');
+      return;
+    }
+    if (numericAge < 1 || numericAge > 120) {
+      toast.error('Age must be between 1 and 120');
+      return;
+    }
+
+    if (!gender) {
+      toast.error('Gender is required');
+      return;
+    }
+
+    navigate('/patient-dashboard', {
+      state: {
+        mobileNumber,
+        name: fullName,
+        age,
+        gender
+      }
+    });
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

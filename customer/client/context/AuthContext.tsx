@@ -42,7 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : window.location.hostname;
       const res = await axiosInstance.get(`/tenant/by-domain?domain=${currentDomain}`);
       if (res.data?.success && res.data?.tenantId) {
-        console.log('[AuthContext] Using tenant ID from API:', res.data.tenantId);
         setTenant(res.data.tenantId);
         return res.data.tenantId;
       }
@@ -51,7 +50,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     // Fallback to default tenant ID
     const fallbackTenantId = 'cmi7et46x0000pj2zmdsp82rm';
-    console.log('[AuthContext] Using fallback tenant ID:', fallbackTenantId);
     setTenant(fallbackTenantId);
     return fallbackTenantId;
   };

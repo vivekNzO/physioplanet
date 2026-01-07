@@ -4,6 +4,7 @@ import axiosInstance from '@/lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 // Utility to capitalize the first letter of every word
 function capitalizeWords(str: string) {
@@ -16,7 +17,6 @@ export default function NewCustomerRegistration() {
   const [gender, setGender] = useState('');
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const mobileNumber = location.state?.mobileNumber || '9988776655';
@@ -35,28 +35,27 @@ export default function NewCustomerRegistration() {
   const handleContinue = async () => {
     // Validation
     if (!fullName.trim()) {
-      setError('Full Name is required');
+      toast.error('Full Name is required');
       return;
     }
 
     const numericAge = parseInt(age, 10);
     if (!age || Number.isNaN(numericAge)) {
-      setError('Age is required and must be a valid number');
+      toast.error('Age is required and must be a valid number');
       return;
     }
     if (numericAge < 1 || numericAge > 120) {
-      setError('Age must be between 1 and 120');
+      toast.error('Age must be between 1 and 120');
       return;
     }
 
     if (!gender) {
-      setError('Gender is required');
+      toast.error('Gender is required');
       return;
     }
 
     try {
       setSubmitting(true);
-      setError(null);
 
       const formData = new FormData();
       formData.append('firstName', firstName);
@@ -80,7 +79,7 @@ export default function NewCustomerRegistration() {
         err?.response?.data?.error ||
         err?.message ||
         'Something went wrong while saving the customer.';
-      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -395,11 +394,6 @@ export default function NewCustomerRegistration() {
                 gap: '17px',
                 flexWrap: 'wrap',
               }}>
-                {error && (
-                  <div className='text-red-600 text-sm'>
-                    {error}
-                  </div>
-                )}
                 <button
                   onClick={() => navigate(-1)}
                   style={{

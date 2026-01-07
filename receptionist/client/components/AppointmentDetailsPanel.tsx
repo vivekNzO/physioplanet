@@ -107,11 +107,6 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
   const [paymentHistoryDialogOpen, setPaymentHistoryDialogOpen] = useState(false);
   const [manageWalkInDialogOpen, setManageWalkInDialogOpen] = useState(false);
 
-  // Debug: Log when dialog state changes
-  useEffect(() => {
-    console.log('Record Payment Dialog Open:', recordPaymentDialogOpen);
-  }, [recordPaymentDialogOpen]);
-
   const fullName = `${item.customer.firstName || ""} ${item.customer.lastName || ""}`.trim() || "Unknown Patient";
   const initials = fullName
     .split(" ")
@@ -254,15 +249,12 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
       .then(res => {
         if (res.data && res.data.success && res.data.data) {
           setRecentPackage(res.data.data);
-          console.log('recentPackage API response:', res.data.data); // Debug log
         } else {
           setRecentPackage(null);
-          console.log('recentPackage API response: null'); // Debug log
         }
       })
       .catch(() => {
         setRecentPackage(null);
-        console.log('recentPackage API error'); // Debug log
       });
   };
 
