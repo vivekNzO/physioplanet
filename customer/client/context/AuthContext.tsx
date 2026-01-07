@@ -31,30 +31,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchTenantByDomain = async () => {
+    const setTenant = (id: string) => {
+      setTenantId(id);
+      // Set cookie for tenant id, expires in 7 days
+      document.cookie = `currentTenantId=${id}; path=/; max-age=${60 * 60 * 24 * 7}`;
+    };
     try {
       const currentDomain = window.location.port 
         ? `${window.location.hostname}:${window.location.port}` 
         : window.location.hostname;
       const res = await axiosInstance.get(`/tenant/by-domain?domain=${currentDomain}`);
-      
       if (res.data?.success && res.data?.tenantId) {
-        setTenantId(res.data.tenantId);
-        // Store in localStorage for future use
-        localStorage.setItem('tenantId', res.data.tenantId);
+        console.log('[AuthContext] Using tenant ID from API:', res.data.tenantId);
+        setTenant(res.data.tenantId);
         return res.data.tenantId;
       }
     } catch (error) {
       console.error('Error fetching tenant by domain:', error);
-      const storedTenantId = localStorage.getItem('tenantId');
-      if (storedTenantId) {
-        setTenantId(storedTenantId);
-        return storedTenantId;
-      }
     }
     // Fallback to default tenant ID
     const fallbackTenantId = 'cmi7et46x0000pj2zmdsp82rm';
-    setTenantId(fallbackTenantId);
-    localStorage.setItem('tenantId', fallbackTenantId);
+    console.log('[AuthContext] Using fallback tenant ID:', fallbackTenantId);
+    setTenant(fallbackTenantId);
     return fallbackTenantId;
   };
 

@@ -2,12 +2,14 @@
 
 import { url } from 'inspector';
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import { Loader } from 'lucide-react';
 import Navbar from '@/components/ui/Navbar';
 
 export default function CheckIn() {
+  const { tenantId } = useAuth();
   const [mobileNumber, setMobileNumber] = useState('');
   const [suggestions, setSuggestions] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -19,23 +21,32 @@ export default function CheckIn() {
   // Debounce phone input
   const normalizedPhone = useMemo(() => mobileNumber.replace(/\D/g, ''), [mobileNumber]);
 
-    const handleContinue = async () => {
+  const handleContinue = async () => {
     if (mobileNumber.length !== 10) return;
 
     try {
       setLoading(true);
       setError(null);
 
+      if (!tenantId) {
+        setError('Tenant ID is required');
+        setLoading(false);
+        return;
+      }
+
       // Check if customer exists
       const res = await axiosInstance.get('/customers/public', {
         params: { phone: mobileNumber },
+        headers: { 'x-tenant-id': tenantId },
       });
 
       const data = res?.data ?? [];
       const customerExists = data.length > 0;
 
       // Send WhatsApp OTP
-      await axiosInstance.post('/twilio/send-otp', { phone: mobileNumber });
+      await axiosInstance.post('/twilio/send-otp', { phone: mobileNumber }, {
+        headers: { 'x-tenant-id': tenantId },
+      });
 
       if (customerExists) {
         const customer = data[0];

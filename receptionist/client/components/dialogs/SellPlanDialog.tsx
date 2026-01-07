@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import RecordPurchaseDialog from "./RecordPurchaseDialog";
 import axiosInstance from "@/lib/axios";
 import PackageSkeleton from "@/skeletons/PackageSkeleton";
 import { Check, Circle } from "lucide-react";
 import toast from "react-hot-toast";
+
 
 interface Service {
   id: string;
@@ -34,9 +36,10 @@ interface SellPlanDialogProps {
   customerId: string;
   appointmentId?: string | null;
   currency?: string;
+  onPurchaseComplete?: () => void;
 }
 
-export default function SellPlanDialog({ open, onClose, onSelect, tenantId, customerId, appointmentId, currency = "INR" }: SellPlanDialogProps) {
+export default function SellPlanDialog({ open, onClose, onSelect, tenantId, customerId, appointmentId, currency = "INR", onPurchaseComplete }: SellPlanDialogProps) {
   const [packages, setPackages] = useState<Package[]>([]);
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
@@ -152,7 +155,12 @@ export default function SellPlanDialog({ open, onClose, onSelect, tenantId, cust
     setShowPayment(true);
   };
 
-  const handlePaymentNow = async () => {
+  const [paying, setPaying] = useState(false);
+
+  const handlePaymentNow = async (amount: number, method: 'cash' | 'online', isPartial: boolean = false) => {
+    if (paying) return;
+    setPaying(true);
+    
     // Collect selected items for purchase
     const items = [];
     // Add selected packages (only package IDs)
@@ -164,23 +172,56 @@ export default function SellPlanDialog({ open, onClose, onSelect, tenantId, cust
       items.push({ itemId: item.id, type: 'SERVICE' });
     });
 
+    const paymentAmount = amount;
+    const purchaseAmount = isPartial ? totalCalculated : amount;
+
     try {
-      const res = await axiosInstance.post('/purchase', {
+      // Step 1: Create the payment record FIRST (atomic operation)
+      const paymentRes = await axiosInstance.post('/payments', {
         tenantId,
         customerId,
-        amount: customTotal !== null ? customTotal : totalCalculated,
+        appointmentId: appointmentId || null,
+        amount: paymentAmount,
         currency,
-        appointmentId,
-        items
+        mode: method, // 'cash' or 'online'
+        status: 'completed',
       });
-      if (res.data && res.data.success) {
-        toast.success('Payment recorded successfully');
-        if (typeof onClose === 'function') onClose();
-      } else {
-        // Optionally show error message
+
+      if (!paymentRes.data || !paymentRes.data.success) {
+        toast.error(paymentRes.data?.error || 'Failed to record payment');
+        return;
       }
-    } catch (error) {
-      // Optionally show error message
+
+      // Step 2: Only create purchase if payment was successful
+      try {
+        const paymentId = paymentRes.data?.data?.id; // Get payment ID from response
+        const purchaseRes = await axiosInstance.post('/purchase', {
+          tenantId,
+          customerId,
+          amount: purchaseAmount,
+          currency,
+          appointmentId,
+          paymentId, // Link purchase to payment
+          items,
+          paymentMethod: method
+        });
+
+        if (purchaseRes.data && purchaseRes.data.success) {
+          toast.success(`Payment of ₹${amount} recorded successfully (${method})`);
+          if (typeof onPurchaseComplete === 'function') onPurchaseComplete();
+          if (typeof onClose === 'function') onClose();
+        } else {
+          console.error('Purchase creation failed after payment:', purchaseRes.data?.error);
+          toast.error(`Payment recorded but purchase failed: ${purchaseRes.data?.error || 'Unknown error'}. Please contact support.`);
+        }
+      } catch (purchaseError: any) {
+        console.error('Purchase creation error after payment:', purchaseError);
+        toast.error(`Payment recorded but purchase failed: ${purchaseError?.response?.data?.error || 'Unknown error'}. Please contact support.`);
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'An error occurred while processing payment');
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -412,90 +453,28 @@ export default function SellPlanDialog({ open, onClose, onSelect, tenantId, cust
             </div>
           </>
       ) : (
-        <>
-          <h2 className="text-4xl text-center mb-6">
-            Record <span className="text-[#1D5287] font-bold">Payments</span>
-          </h2>
-          <div className="space-y-4">
-            {/* Packages */}
-            {selectedPackages.map(pkg => (
-              <div key={pkg.id} className="bg-[#E3F0D9] rounded-lg p-4 border border-[#ABD28C]">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[#1D5287] flex items-center justify-center flex-shrink-0">
-                      <Check className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="font-semibold text-lg">{pkg.name}</span>
-                  </div>
-                  <span className="text-[#1D5287] font-bold text-xl">₹{Number(pkg.finalPrice || pkg.price)}/-</span>
-                </div>
-                {pkg.packageItems && pkg.packageItems.length > 0 && (
-                  <div className="bg-white rounded-full px-4 py-2 text-xs text-[#1D5287] text-center font-medium mb-2">
-                    {pkg.packageItems.map(item => item.servicePrice?.service?.name).filter(Boolean).join(' / ')}
-                  </div>
-                )}
-                <div className="text-center text-xs font-medium mt-2">ONE TIME PAYMENT</div>
-              </div>
-            ))}
-            {/* Standalone selected services (not part of selected packages, from both packages and services tab) */}
-            {[
-              // Old logic: services from packages
-              ...packages
-                .flatMap(pkg => pkg.packageItems || [])
-                .filter(item => selectedServiceIds.includes(item.id) && !packageServiceIds.includes(item.id)),
-              // New logic: services from services tab (API)
-              ...uniqueStandaloneServices
-            ].map(item => (
-              <div key={item.id} className="bg-[#F0F4FA] rounded-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#1D5287] flex items-center justify-center flex-shrink-0">
-                    <Check className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="font-medium text-base">{item.servicePrice?.service?.name}</span>
-                </div>
-                <span className="text-[#1D5287] font-bold text-lg">₹{Number(item.servicePrice?.price) || 0}/-</span>
-              </div>
-            ))}
-            {/* Total sum */}
-            <div className="flex items-center justify-between py-2">
-              <span className="font-semibold text-lg">Total Payment</span>
-              {isEditingTotal ? (
-                <input
-                  type="number"
-                  min={0}
-                  className="text-xl font-bold border rounded px-2 py-1 w-32 focus:outline-none focus:ring"
-                  value={customTotal !== null ? String(customTotal).replace(/^0+/, '') : String(totalCalculated).replace(/^0+/, '')}
-                  onChange={e => {
-                    const val = e.target.value.replace(/^0+/, '');
-                    setCustomTotal(val === '' ? 0 : Number(val));
-                  }}
-                  onBlur={() => setIsEditingTotal(false)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') setIsEditingTotal(false);
-                  }}
-                  autoFocus
-                />
-              ) : (
-                customTotal !== null && customTotal !== totalCalculated ? (
-                  <span className="text-xl font-bold flex items-center gap-5" title="Click to edit total payment" >
-                    <span className="text-lg text-red-400 line-through decoration-2">₹{totalCalculated}/-</span>
-                    <span className="text-xl text-[#1D5287] cursor-pointer font-bold hover:underline" onClick={() => setIsEditingTotal(true)}>₹{customTotal}/-</span>
-                  </span>
-                ) : (
-                  <span className="text-xl font-bold cursor-pointer hover:underline" title="Click to edit total payment" onClick={() => setIsEditingTotal(true)}>
-                    ₹{totalCalculated}/-
-                  </span>
-                )
-              )}
-            </div>
-            <Button 
-              onClick={handlePaymentNow}
-              className="w-full bg-gradient-to-r from-[#75B640] to-[#52813C] text-white font-semibold py-6 text-lg"
-            >
-              PAYMENT NOW
-            </Button>
-          </div>
-        </>
+        <RecordPurchaseDialog
+          open={showPayment}
+          onClose={() => setShowPayment(false)}
+          defaultAmount={customTotal !== null ? customTotal : totalCalculated}
+          selectedPackages={selectedPackages}
+          selectedServices={[
+            ...packages
+              .flatMap(pkg => pkg.packageItems || [])
+              .filter(item => selectedServiceIds.includes(item.id) && !packageServiceIds.includes(item.id)),
+            ...uniqueStandaloneServices
+          ]}
+          totalCalculated={totalCalculated}
+          customTotal={customTotal}
+          onTotalChange={setCustomTotal}
+          isEditingTotal={isEditingTotal}
+          onEditTotal={setIsEditingTotal}
+          paying={paying}
+          showLineThrough={true}
+          onPay={(amount, method, isPartial) => {
+            handlePaymentNow(amount, method, !!isPartial);
+          }}
+        />
       )}
       </DialogContent>
     </Dialog>

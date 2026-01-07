@@ -197,16 +197,28 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
 
         <div className="flex flex-col items-center justify-between text-sm">
           <span className={`font-semibold ${getPendingAmountColor()}`}>
-            {item.pendingAmount === 0 ? (
-              <span className="flex items-center gap-1">
-                <span className="text-emerald-600">Full Paid</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1">
-                <span className="text-orange-600">₹{item.pendingAmount.toLocaleString()}</span>
-                <span className="text-gray-500">Pending</span>
-              </span>
-            )}
+            {(() => {
+
+              if (item.paidAmount >= item.totalAmount && item.totalAmount > 0) {
+                return (
+                  <span className="flex items-center gap-1">
+                    <span className="text-emerald-600">Full Paid</span>
+                  </span>
+                );
+              } else if (item.paidAmount > 0) {
+                return (
+                  <span className="flex items-center gap-1">
+                    <span className="text-gray-500">Pending</span>
+                  </span>
+                );
+              } else {
+                return (
+                  <span className="flex items-center gap-1">
+                    <span className="text-red-600">Unpaid</span>
+                  </span>
+                );
+              }
+            })()}
           </span>
           <div>
             {isWalkIn ? (

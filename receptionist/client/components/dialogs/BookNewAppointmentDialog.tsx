@@ -299,8 +299,9 @@ export default function BookNewAppointmentDialog({
     e.preventDefault();
 
     // Validation
-    if (!formData.customer.phone) {
-      toast.error("Phone number is required");
+    const phoneDigits = (formData.customer.phone || "").replace(/\D/g, "");
+    if (!formData.customer.phone || phoneDigits.length !== 10) {
+      toast.error("Phone number must be exactly 10 digits");
       return;
     }
 
@@ -329,12 +330,10 @@ export default function BookNewAppointmentDialog({
         customerFormData.append('phone', formData.customer.phone);
         customerFormData.append('firstName', formData.customer.firstName);
         customerFormData.append('gender', formData.customer.gender);
-        
         // Add photo if selected
         if (selectedFile) {
           customerFormData.append('photo', selectedFile);
         }
-        
         // Add metadata as JSON string (backend will handle it)
         // Or store age in notes/separate field if needed
         const response = await axiosInstance.post("/customers", customerFormData, {
@@ -343,6 +342,24 @@ export default function BookNewAppointmentDialog({
           },
         });
         customerId = response.data.data.id;
+      }
+
+      // Check for existing appointment for today
+      if (customerId) {
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+        const { data } = await axiosInstance.get(`/appointments?customerId=${customerId}`);
+        const hasTodayAppointment = (data?.data || []).some((appt: any) => {
+          if (!appt.startAt) return false;
+          const apptDate = new Date(appt.startAt);
+          return apptDate >= startOfDay && apptDate <= endOfDay;
+        });
+        if (hasTodayAppointment) {
+          toast.error('Customer already has an appointment for today.');
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Always create a walk-in appointment for this customer
@@ -579,7 +596,11 @@ export default function BookNewAppointmentDialog({
           <Button
             type="submit"
             className="w-full bg-gradient-to-r from-[#75B640] to-[#52813C] text-white py-6 text-lg "
-            disabled={isLoading || !showCustomerFields}
+            disabled={
+              isLoading || 
+              !showCustomerFields || 
+              (formData.customer.phone || "").replace(/\D/g, "").length !== 10
+            }
           >
             {isLoading ? "Processing..." : "Create Appointment"}
           </Button>

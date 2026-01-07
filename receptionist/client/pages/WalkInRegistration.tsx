@@ -120,16 +120,29 @@ export default function WalkInRegistration() {
               border: '1px solid #E4E5EB',
               background: 'linear-gradient(135deg, #FAFAFC 0%, rgba(250, 250, 252, 0.7) 100%)',
             }}>
-              <div style={{
-                width: '59px',
-                height: '59px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: '29.5px',
-                background: 'linear-gradient(180deg, #0557A8 0%, #1BB7E9 100%)',
-                flexShrink: 0,
-              }}>
+            <div style={{
+              width: '59px',
+              height: '59px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: '29.5px',
+              overflow: 'hidden',
+              background: profilePhoto ? 'transparent' : 'linear-gradient(180deg, #0557A8 0%, #1BB7E9 100%)',
+              flexShrink: 0,
+            }}>
+              {profilePhoto ? (
+                <img
+                  src={URL.createObjectURL(profilePhoto)}
+                  alt="profile"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '50%',
+                  }}
+                />
+              ) : (
                 <span style={{
                   color: '#FFF',
                   textAlign: 'center',
@@ -139,7 +152,8 @@ export default function WalkInRegistration() {
                 }}>
                   NE
                 </span>
-              </div>
+              )}
+            </div>
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',

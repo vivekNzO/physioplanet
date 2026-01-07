@@ -470,6 +470,7 @@ function AppointmentsPageContent() {
     const staffForSlot = formData.staffId || (selectedSlot.staffIds && selectedSlot.staffIds[0]) || ""
 
     // Resolve customer: use selected customerId if present; otherwise create customer from form data
+
     const payload: any = {
       staffId: staffForSlot,
       serviceId: null,
@@ -506,6 +507,29 @@ function AppointmentsPageContent() {
     } else {
       payload.customerId = formData.customerId
     }
+
+    // Duplicate appointment check (only if customerId is present)
+    if (payload.customerId) {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      try {
+        const { data } = await axiosInstance.get(`/appointments?customerId=${payload.customerId}`);
+        const hasTodayAppointment = (data?.data || []).some((appt: any) => {
+          if (!appt.startAt) return false;
+          const apptDate = new Date(appt.startAt);
+          return apptDate >= startOfDay && apptDate <= endOfDay;
+        });
+        if (hasTodayAppointment) {
+          toast.error('Customer already has an appointment for today.');
+          return;
+        }
+      } catch (err) {
+        // Optionally handle error, but allow booking if check fails
+        console.error('Error checking for duplicate appointment', err);
+      }
+    }
+
     try {
       setIsSubmitting(true)
       const response = await axiosInstance.post('/appointments', payload)

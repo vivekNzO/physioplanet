@@ -1,8 +1,14 @@
 'use client';
 
 import axiosInstance from '@/lib/axios';
+import { useAuth } from '../context/AuthContext';
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+
+// Utility to capitalize the first letter of every word
+function capitalizeWords(str: string) {
+  return str.replace(/\b\w+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
 
 export default function NewCustomerRegistration() {
   const [fullName, setFullName] = useState('');
@@ -17,11 +23,14 @@ export default function NewCustomerRegistration() {
 
   const [firstName, lastName] = useMemo(() => {
     if (!fullName.trim()) return ['', ''];
-    const parts = fullName.trim().split(/\s+/);
+    const capitalized = capitalizeWords(fullName.trim());
+    const parts = capitalized.split(/\s+/);
     const first = parts.shift() ?? '';
     const last = parts.length ? parts.join(' ') : '';
     return [first, last];
   }, [fullName]);
+
+  const { tenantId } = useAuth();
 
   const handleContinue = async () => {
     // Validation
@@ -29,10 +38,17 @@ export default function NewCustomerRegistration() {
       setError('Full Name is required');
       return;
     }
-    if (!age || parseInt(age) <= 0) {
-      setError('Age is required and must be greater than 0');
+
+    const numericAge = parseInt(age, 10);
+    if (!age || Number.isNaN(numericAge)) {
+      setError('Age is required and must be a valid number');
       return;
     }
+    if (numericAge < 1 || numericAge > 120) {
+      setError('Age must be between 1 and 120');
+      return;
+    }
+
     if (!gender) {
       setError('Gender is required');
       return;
@@ -50,7 +66,10 @@ export default function NewCustomerRegistration() {
       if(gender) formData.append('gender', gender);
 
       await axiosInstance.post('/customers/public', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        },
       });
 
       navigate('/welcome-page', {
@@ -151,19 +170,25 @@ export default function NewCustomerRegistration() {
               gap: '17px',
             }}>
               <div style={{
-                width: '59px',
-                height: '59px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: '29.5px',
-                background: profilePhoto ? 'transparent' :  'linear-gradient(180deg, #0557A8 0%, #1BB7E9 100%)',
+              width: '59px',
+              height: '59px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: '29.5px',
+              overflow: 'hidden',
+              background: profilePhoto ? 'transparent' :  'linear-gradient(180deg, #0557A8 0%, #1BB7E9 100%)',
               }}>
-                {profilePhoto ? (
+              {profilePhoto ? (
                   <img
                     src={URL.createObjectURL(profilePhoto)}
                     alt='profile'
-                    className='w-full h-full object-cover'
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '50%',
+                    }}
                   /> 
                 ):(
                   <span className='text-white text-lg font-semibold'>
@@ -271,8 +296,8 @@ export default function NewCustomerRegistration() {
                     </label>
                     <input
                       type='text'
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      value={capitalizeWords(fullName)}
+                      onChange={(e) => setFullName(capitalizeWords(e.target.value))}
                       placeholder='Enter your Full Name'
                       className='w-full h-[51px] px-[21px] radius-[4px] background-white border border-[#E9EAEB] text-[#0D0D0D] text-sm font-normal outline-none '
                     />
@@ -281,13 +306,14 @@ export default function NewCustomerRegistration() {
                   <div className='flex gap-2 '>
                     <div className='flex flex-col w-1/2 gap-[10px] color-[#0d0d0d] text-sm'>
                       <label>Age</label>
-                      <input type='number'
+                      <input
+                        type='number'
                         value={age}
                         onChange={(e) => setAge(e.target.value)}
                         placeholder='Your Age'
-                        className='w-full h-[51px] px-[21px] radius-[4px] border border-[#E9EAEB] outline-none
- '
-                        min={0}
+                        className='w-full h-[51px] px-[21px] radius-[4px] border border-[#E9EAEB] outline-none'
+                        min={1}
+                        max={120}
                       />
                     </div>
                     <div className='flex flex-col w-1/2 gap-[10px] color-[#0d0d0d] text-sm' >

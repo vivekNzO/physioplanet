@@ -54,7 +54,7 @@ export default function ReceptionDashboard() {
     }
   }, [searchQuery]);
 
-  const fetchTodaysAppointments = async () => {
+  const fetchTodaysAppointments = async (preserveSelection?: { customerId: string }) => {
      // Only set loading if not initial load
      if (!isInitialLoad) setLoading(true);
     try {
@@ -102,38 +102,28 @@ export default function ReceptionDashboard() {
 
       // Group appointments by customer
       const customerMap = new Map<string, QueueItem>();
-      const allowedStatuses = [
-        PatientQueueStatus.WAITING,
-        PatientQueueStatus.IN_EXERCISE,
-        PatientQueueStatus.COMPLETED,
-        PatientQueueStatus.CANCELLED,
-      ];
-
       todaysAppointments.forEach((apt: any) => {
         const customerId = apt.customer?.id || apt.customerId;
         if (!customerMap.has(customerId)) {
           let queueStatus = PatientQueueStatus.WAITING;
-          if (apt.appointmentType === 'PREBOOKING') {
-            // If receptionist has set a valid status, use it
-            if (apt.status && allowedStatuses.includes(apt.status)) {
-              queueStatus = apt.status;
-            } else {
-              // Otherwise, use automatic logic
-              const autoStatus = getDefaultStatus(apt.startAt);
-              if (autoStatus === "Waiting") {
-                queueStatus = PatientQueueStatus.WAITING;
-              } else if (autoStatus === "In Exercise") {
-                queueStatus = PatientQueueStatus.IN_EXERCISE;
-              } else if (autoStatus === "Completed") {
-                queueStatus = PatientQueueStatus.COMPLETED;
-              }
-            }
-          } else if (apt.appointmentType === 'WALKIN') {
-            // For walk-ins, always WAITING by default unless receptionist overrides with a valid status
-            if (apt.status && allowedStatuses.includes(apt.status) && apt.status !== PatientQueueStatus.WAITING) {
-              queueStatus = apt.status;
-            } else {
+          
+          const allowedStatuses = [
+            PatientQueueStatus.WAITING,
+            PatientQueueStatus.IN_EXERCISE,
+            PatientQueueStatus.COMPLETED,
+            PatientQueueStatus.CANCELLED,
+          ];
+
+          if (apt.status && allowedStatuses.includes(apt.status)) {
+            queueStatus = apt.status;
+          } else {
+            const autoStatus = getDefaultStatus(apt.startAt);
+            if (autoStatus === "Waiting") {
               queueStatus = PatientQueueStatus.WAITING;
+            } else if (autoStatus === "In Exercise") {
+              queueStatus = PatientQueueStatus.IN_EXERCISE;
+            } else if (autoStatus === "Completed") {
+              queueStatus = PatientQueueStatus.COMPLETED;
             }
           }
           customerMap.set(customerId, {
@@ -148,21 +138,55 @@ export default function ReceptionDashboard() {
           });
         }
         const item = customerMap.get(customerId)!;
-        item.totalAmount += parseFloat(apt.price);
-        // Mock paid amount - in real app, this would come from payment records
-        if (apt.status === PatientQueueStatus.COMPLETED) {
-          item.paidAmount += parseFloat(apt.price);
+        if (!item.appointments.find(a => a.id === apt.id)) {
+          item.appointments.push(apt);
         }
       });
 
-      // Calculate pending amounts
-      const queueItems = Array.from(customerMap.values()).map(item => ({
-        ...item,
-        pendingAmount: item.totalAmount - item.paidAmount,
-      }));
+      const queueItems = await Promise.all(
+        Array.from(customerMap.values()).map(async (item) => {
+          try {
+            // Fetch total payments and purchases for this customer
+            const [paymentRes, purchaseRes] = await Promise.all([
+              axiosInstance.get(`/payments/summary?customerId=${item.customer.id}`).catch(() => ({ data: { success: false, data: { totalPaid: 0 } } })),
+              axiosInstance.get(`/purchase/summary?customerId=${item.customer.id}`).catch(() => ({ data: { success: false, data: { totalPurchased: 0 } } })),
+            ]);
+
+            const totalPaid = paymentRes.data?.success ? paymentRes.data.data.totalPaid : 0;
+            const totalPurchased = purchaseRes.data?.success ? purchaseRes.data.data.totalPurchased : 0;
+
+            const paidAmount = totalPaid;
+            const totalAmount = totalPurchased;
+            const pendingAmount = Math.max(0, totalPurchased - totalPaid);
+
+            return {
+              ...item,
+              totalAmount,
+              paidAmount,
+              pendingAmount,
+            };
+          } catch (error) {
+            console.error(`Error fetching payment/purchase summary for customer ${item.customer.id}:`, error);
+            // Fallback to zero if API fails
+            return {
+              ...item,
+              totalAmount: 0,
+              paidAmount: 0,
+              pendingAmount: 0,
+            };
+          }
+        })
+      );
 
       setQueueData(queueItems);
-      if (queueItems.length > 0) {
+      
+      // If we need to preserve selection, find and select that customer
+      if (preserveSelection) {
+        const customerToSelect = queueItems.find(item => item.customer.id === preserveSelection.customerId);
+        if (customerToSelect) {
+          await handleSelectCustomer(customerToSelect);
+        }
+      } else if (queueItems.length > 0) {
         // Fetch appointments for the first customer
         await handleSelectCustomer(queueItems[0]);
       }
@@ -171,6 +195,84 @@ export default function ReceptionDashboard() {
       toast.error("Failed to load appointments");
     } finally {
       if (!isInitialLoad) setLoading(false);
+    }
+  };
+
+  // Refresh payment summary for a specific customer
+  const refreshCustomerPaymentSummary = async (customerId: string) => {
+    try {
+      // Fetch updated payment and purchase totals
+      const [paymentRes, purchaseRes] = await Promise.all([
+        axiosInstance.get(`/payments/summary?customerId=${customerId}`).catch(() => ({ data: { success: false, data: { totalPaid: 0 } } })),
+        axiosInstance.get(`/purchase/summary?customerId=${customerId}`).catch(() => ({ data: { success: false, data: { totalPurchased: 0 } } })),
+      ]);
+
+      const totalPaid = paymentRes.data?.success ? paymentRes.data.data.totalPaid : 0;
+      const totalPurchased = purchaseRes.data?.success ? purchaseRes.data.data.totalPurchased : 0;
+      const paidAmount = totalPaid;
+      const totalAmount = totalPurchased;
+      const pendingAmount = Math.max(0, totalPurchased - totalPaid);
+
+      // Update queue data
+      setQueueData(prevQueue => 
+        prevQueue.map(item => 
+          item.customer.id === customerId 
+            ? { ...item, totalAmount, paidAmount, pendingAmount }
+            : item
+        )
+      );
+
+      // Update selected item if it's the same customer
+      if (selectedItem && selectedItem.customer.id === customerId) {
+        setSelectedItem(prev => prev ? { ...prev, totalAmount, paidAmount, pendingAmount } : null);
+      }
+    } catch (error) {
+      console.error("Error refreshing payment summary:", error);
+    }
+  };
+
+  // Refresh appointment data for a specific customer (used after updating walk-in appointments)
+  const refreshCustomerAppointment = async (customerId: string, appointmentId?: string) => {
+    try {
+      // Refresh the entire queue first to get updated data
+      await fetchTodaysAppointments({ customerId });
+
+      // Then fetch the specific appointment with full details (staff, service, etc.)
+      if (appointmentId) {
+        try {
+          const { data } = await axiosInstance.get(`/appointments/${appointmentId}`);
+          const updatedAppointment = data?.data || data;
+
+          if (updatedAppointment) {
+            // Update the appointment in queueData with full details
+            setQueueData(currentQueue => 
+              currentQueue.map(item => 
+                item.customer.id === customerId 
+                  ? { 
+                      ...item, 
+                      appointments: item.appointments.map(apt => 
+                        apt.id === appointmentId ? updatedAppointment : apt
+                      )
+                    }
+                  : item
+              )
+            );
+
+            // Update selectedItem with full appointment details
+            setSelectedItem(prev => {
+              if (!prev || prev.customer.id !== customerId) return prev;
+              const updatedAppointments = prev.appointments.map(apt => 
+                apt.id === appointmentId ? updatedAppointment : apt
+              );
+              return { ...prev, appointments: updatedAppointments };
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching updated appointment:", err);
+        }
+      }
+    } catch (error) {
+      console.error("Error refreshing customer appointment:", error);
     }
   };
 
@@ -343,7 +445,11 @@ export default function ReceptionDashboard() {
             loadingAppointments && selectedItem.appointments.length === 0 ? (
               <AppointmentDetailsSkeleton />
             ) : (
-              <AppointmentDetailsPanel item={selectedItem} />
+              <AppointmentDetailsPanel 
+                item={selectedItem} 
+                onPaymentRecorded={() => refreshCustomerPaymentSummary(selectedItem.customer.id)}
+                onAppointmentUpdated={(appointmentId) => refreshCustomerAppointment(selectedItem.customer.id, appointmentId)}
+              />
             )
           ) : (
             <div className="h-[580px] flex items-center justify-center text-gray-500 bg-white shadow-sm">

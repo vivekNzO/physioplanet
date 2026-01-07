@@ -19,11 +19,15 @@ export default function TimeSlots({
   date,
   onSelect,
   selectedSlotId,
+  excludeAppointmentId,
+  excludeSlots = [],
 }: {
   staffId?: string
   date: Date
   onSelect: (slot: Slot) => void
   selectedSlotId?: string
+  excludeAppointmentId?: string
+  excludeSlots?: { startIso: string; endIso?: string }[]
 }) {
   const [slots, setSlots] = useState<Slot[]>([])
   const [loading, setLoading] = useState(false)
@@ -41,7 +45,16 @@ export default function TimeSlots({
     const fetchForStaff = async (sId: string) => {
       try {
         // Use central availability endpoint which builds slots from staff availability and excludes booked appointments
-        const res = await axiosInstance.get('/appointments/available', { params: { staffId: sId, date: isoDate } })
+        // Add timestamp to prevent caching
+        const params: any = { 
+          staffId: sId, 
+          date: isoDate,
+          _t: Date.now() // Cache buster
+        }
+        if (excludeAppointmentId) {
+          params.excludeAppointmentId = excludeAppointmentId
+        }
+        const res = await axiosInstance.get('/appointments/available', { params })
         const slotsData = res.data?.slots || res.data || []
 
         // Map into UI slot shape, attach staff meta
@@ -77,7 +90,7 @@ export default function TimeSlots({
     return () => {
       mounted = false
     }
-  }, [staffId, isoDate, date])
+  }, [staffId, isoDate, date, excludeAppointmentId])
 
   if (loading) return <TimeSlotSkeleton date={date} />
 
@@ -88,7 +101,16 @@ export default function TimeSlots({
     return slotStart < now
   }
 
-  const availableSlots = slots.filter(slot => slot.available && !isSlotPast(slot))
+  const availableSlots = slots
+    .filter(slot => slot.available && !isSlotPast(slot))
+    .filter(slot => {
+      if (!excludeSlots.length) return true
+      return !excludeSlots.some(ex => {
+        const matchStart = ex.startIso && slot.startIso === ex.startIso
+        const matchEnd = ex.endIso ? slot.endIso === ex.endIso : false
+        return matchStart || matchEnd
+      })
+    })
 
   return (
     <div className="space-y-3 max-h-[250px] overflow-hidden">
@@ -109,10 +131,17 @@ export default function TimeSlots({
       <div className="max-h-[260px] overflow-auto no-scrollbar pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="grid grid-cols-2 gap-[10px]">
           {availableSlots.map(slot => {
-            // Format UTC times to IST for display using our utility
-            const startTime = formatTimeInIst12Hour(slot.startIso).replace(' ', '');
-            const endTime = formatTimeInIst12Hour(slot.endIso);
-            const label = `${startTime}-${endTime}`.toLowerCase();
+            // Format UTC times to IST for display, show am/pm only once at the end
+            const startDate = new Date(slot.startIso);
+            const endDate = new Date(slot.endIso);
+
+            const startHour = startDate.getHours() % 12 || 12;
+            const startMin = startDate.getMinutes().toString().padStart(2, '0');
+            const endHour = endDate.getHours() % 12 || 12;
+            const endMin = endDate.getMinutes().toString().padStart(2, '0');
+            const ampm = endDate.getHours() < 12 ? 'am' : 'pm';
+
+            const label = `${startHour}:${startMin}–${endHour}:${endMin} ${ampm}`.toLocaleUpperCase();
 
             return (
               <button

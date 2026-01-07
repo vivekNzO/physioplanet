@@ -48,6 +48,7 @@ export interface Appointment {
   status: string;
   price: number;
   currency: string;
+  appointmentType?: 'WALKIN' | 'PREBOOKING';
   customer?: Customer;
   staff?: Staff;
   service?: Service;
@@ -74,12 +75,17 @@ import SellPlanDialog from "./dialogs/SellPlanDialog";
 import { useAuth } from "../context/AuthContext";
 import SellPlanDialog2 from "./dialogs/SellPlanDialog2";
 import PaymentHistoryDialog from "./dialogs/PaymentHistoryDialog";
+import PurchaseHistoryDialog from "./dialogs/PurchaseHistoryDialog";
+import RecordPaymentDialog from "./dialogs/RecordPaymentDialog";
+import ManageWalkInAppointmentDialog from "./dialogs/ManageWalkInAppointmentDialog";
 
 interface AppointmentDetailsPanelProps {
   item: QueueItem;
+  onPaymentRecorded?: () => void;
+  onAppointmentUpdated?: (appointmentId: string) => void;
 }
 
-export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPanelProps) {
+export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onAppointmentUpdated }: AppointmentDetailsPanelProps) {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const { tenantId } = useAuth();
   const [generalInfoOpen, setGeneralInfoOpen] = useState(false);
@@ -89,9 +95,22 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [allAppointments, setAllAppointments] = useState<any[]>([]);
-  // Sell Plan Dialog state
+  const [appointmentPurchases, setAppointmentPurchases] = useState<Record<string, any[]>>({}); // Map of appointmentId -> purchases
+  const [appointmentUpdateTimestamp, setAppointmentUpdateTimestamp] = useState<number>(0); // Track when appointment was updated
   const [sellPlanDialogOpen, setSellPlanDialogOpen] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [purchaseHistoryDialogOpen, setPurchaseHistoryDialogOpen] = useState(false);
+  const [recordPaymentDialogOpen, setRecordPaymentDialogOpen] = useState(false);
+  const [recordingPayment, setRecordingPayment] = useState(false);
+  const [customTotal, setCustomTotal] = useState<number | null>(null);
+  const [isEditingTotal, setIsEditingTotal] = useState(false);
+  const [paymentHistoryDialogOpen, setPaymentHistoryDialogOpen] = useState(false);
+  const [manageWalkInDialogOpen, setManageWalkInDialogOpen] = useState(false);
+
+  // Debug: Log when dialog state changes
+  useEffect(() => {
+    console.log('Record Payment Dialog Open:', recordPaymentDialogOpen);
+  }, [recordPaymentDialogOpen]);
 
   const fullName = `${item.customer.firstName || ""} ${item.customer.lastName || ""}`.trim() || "Unknown Patient";
   const initials = fullName
@@ -134,7 +153,28 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
         const res = await axiosInstance.get(
           `/appointments?customerId=${item.customer.id}`
         );
-        setAllAppointments(res.data.data || []);
+        const appointments = res.data.data || [];
+        setAllAppointments(appointments);
+        
+        // Fetch purchases for each appointment
+        const purchasesMap: Record<string, any[]> = {};
+        await Promise.all(
+          appointments.map(async (apt: any) => {
+            if (apt.id) {
+              try {
+                const purchaseRes = await axiosInstance.get(
+                  `/purchase?appointmentId=${apt.id}`
+                );
+                if (purchaseRes.data?.success && purchaseRes.data.data) {
+                  purchasesMap[apt.id] = purchaseRes.data.data;
+                }
+              } catch (err) {
+                console.error(`Failed to fetch purchases for appointment ${apt.id}:`, err);
+              }
+            }
+          })
+        );
+        setAppointmentPurchases(purchasesMap);
       } catch (err) {
         console.error('Failed to fetch appointments:', err);
         setAllAppointments([]);
@@ -207,18 +247,61 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
 
   // Fetch most recent package bought by the customer
   const [recentPackage, setRecentPackage] = useState<{ name: string; totalSessions?: number; usedSessions?: number } | null>(null);
-  useEffect(() => {
+  // Function to fetch latest package
+  const fetchLatestPackage = () => {
     if (!item.customer.id) return;
     axiosInstance.get(`/purchase/latest-package?customerId=${item.customer.id}`)
       .then(res => {
         if (res.data && res.data.success && res.data.data) {
           setRecentPackage(res.data.data);
+          console.log('recentPackage API response:', res.data.data); // Debug log
         } else {
           setRecentPackage(null);
+          console.log('recentPackage API response: null'); // Debug log
         }
       })
-      .catch(() => setRecentPackage(null));
+      .catch(() => {
+        setRecentPackage(null);
+        console.log('recentPackage API error'); // Debug log
+      });
+  };
+
+  useEffect(() => {
+    fetchLatestPackage();
   }, [item.customer.id]);
+
+  // Handle payment-only (no purchase) - called from Record Payment button
+  const handleRecordPaymentOnly = async (amount: number, method: 'cash' | 'online') => {
+    if (recordingPayment) return;
+    setRecordingPayment(true);
+
+    try {
+      const paymentRes = await axiosInstance.post('/payments', {
+        tenantId: tenantId || '',
+        customerId: item.customer.id,
+        appointmentId: item.appointments[0]?.id || null,
+        amount,
+        currency: item.appointments[0]?.currency || 'INR',
+        mode: method, // 'cash' or 'online'
+        status: 'completed',
+      });
+
+      if (paymentRes.data && paymentRes.data.success) {
+        toast.success(`Payment of ₹${amount} recorded successfully (${method})`);
+        setRecordPaymentDialogOpen(false);
+        if (onPaymentRecorded) {
+          onPaymentRecorded();
+        }
+      } else {
+        toast.error(paymentRes.data?.error || 'Failed to record payment');
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'An error occurred while recording payment');
+    } finally {
+      setRecordingPayment(false);
+    }
+  };
+  
 
 
 
@@ -257,7 +340,34 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
           </div>
 
         {/* Tab Buttons */}
+
         <div className="flex gap-5">
+        {(() => {
+          const appointment = item.appointments?.[0];
+          if (!appointment) return null;
+          
+          // Check if endAt is not null and has passed - if so, don't show button
+          if (appointment.endAt) {
+            const endDate = new Date(appointment.endAt);
+            const now = new Date();
+            if (endDate < now) {
+              return null; // Don't show button if appointment has ended
+            }
+          }
+          
+          // Determine button label based on startAt
+          const buttonLabel = appointment.startAt ? 'Reschedule' : 'Manage';
+          
+          return (
+            <Button 
+              variant="outline" 
+              className="text-xs font-medium"
+              onClick={() => setManageWalkInDialogOpen(true)}
+            >
+              {buttonLabel}
+            </Button>
+          );
+        })()}
           <Button 
             variant="outline" 
             className="text-xs font-medium"
@@ -272,6 +382,7 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
           >
             Last Feedbacks
           </Button>
+
         </div>
         </div>
       </div>
@@ -373,16 +484,17 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
           </Card>
         </div>
 
-        {/* Plans Details Section */}
+        {/* Plan Details Section */}
         <div className="flex-1 basis-[30%]">
-          <Card className="border-gray-200 p-5 h-full flex flex-col justify-between">
+          <Card className="border-gray-200 p-5 h-full flex flex-col">
            <h3 className="text-[18px] font-normal mb-[25px]">
                 Plan <span className="text-[#1D5287] font-bold">Details</span>
             </h3>
-            <CardContent className="p-0 bg-white">
+            <CardContent className="p-0 bg-white flex flex-col justify-between flex-1">
               <div className="mb-6">
-                <h4 className="text-sm font-medium mb-2">{recentPackage ? recentPackage.name : "No package purchased yet"}</h4>
+                <h4 className="text-xl font-medium mb-2">{recentPackage ? recentPackage.name : "No package purchased yet"}</h4>
               </div>
+              <div>
               <Button
                 className="w-full text-xs bg-gradient-to-r from-[#75B640] to-[#52813C] text-white"
                 onClick={() => setSellPlanDialogOpen(true)}
@@ -400,50 +512,61 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                 customerId={item.customer.id}
                 appointmentId={item.appointments[0]?.id || null}
                 currency={item.appointments[0]?.currency || "INR"}
-              />
-              {/* <SellPlanDialog2
-                open={sellPlanDialogOpen}
-                onClose={() => setSellPlanDialogOpen(false)}
-                onSelect={pkg => {
-                  setSelectedPackage(pkg);
-                  setSellPlanDialogOpen(false);
-                  // You can add further logic here to proceed with selling the selected package
+                onPurchaseComplete={() => {
+                  fetchLatestPackage();
+                  if (onPaymentRecorded) {
+                    onPaymentRecorded();
+                  }
                 }}
-              /> */}
+              />
+              <Button variant="outline" className="w-full text-xs mt-2 font-medium" onClick={() => setPurchaseHistoryDialogOpen(true)}>
+                  View Past Purchases
+                </Button>
+                <PurchaseHistoryDialog
+                  open={purchaseHistoryDialogOpen}
+                  onClose={() => setPurchaseHistoryDialogOpen(false)}
+                  customerId={item.customer.id}
+              />
+            </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Payment Summary Section */}
         <div className="flex-1 basis-[30%]">
-          <Card className="border-gray-200 p-5 h-full">
+          <Card className="border-gray-200 p-5 h-full flex flex-col">
             <h3 className="text-[18px] font-normal mb-[25px]">
                 Payment <span className="text-[#1D5287] font-bold">Summary</span>
             </h3>
-            <CardContent className="p-0 bg-white">
-              <div className="mb-6">
-                <h4 className="text-xs font-medium mb-[14px]">
-                  {recentPackage ? recentPackage.name : "No package purchased yet"}
-                </h4>
+            <CardContent className="p-0 bg-white flex flex-col justify-between flex-1">
+              <div>
                 <div className="space-y-2 mb-6">
+                  <div className="flex justify-between items-center text-[18px] font-medium text-[#101111]">
+                    <span className={`font-semibold ${item.pendingAmount === 0 ? 'text-gray-500' : 'text-red-600'}`}>
+                      ₹{item.pendingAmount.toLocaleString()}.00 PENDING
+                    </span>
+                  </div>
                   <div className="flex justify-between items-center text-[18px] font-semibold">
-                    <span className="text-red-600 font-semibold">₹{item.totalAmount.toLocaleString()}.00 PAID</span>
+                    <span className="text-green-600 font-semibold">₹{item.paidAmount.toLocaleString()}.00 PAID</span>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] font-medium text-[#101111]">
-                    <span>₹{item.pendingAmount.toLocaleString()}.00 PENDING</span>
-                  </div>
+
                 </div>
               </div>
-              <div className="space-y-2">
-                <Button className="w-full bg-gradient-to-r from-[#75B640] to-[#52813C] text-white text-xs font-medium">
+              <div className="space-y-2 mt-4">
+                <Button 
+                  className="w-full bg-gradient-to-r from-[#75B640] to-[#52813C] text-white text-xs font-medium"
+                  onClick={() => {
+                    setRecordPaymentDialogOpen(true);
+                  }}
+                >
                   Record Payment
                 </Button>
-                <Button variant="outline" className="w-full text-xs font-medium" onClick={() => setPaymentDialogOpen(true)}>
+                <Button variant="outline" className="w-full text-xs font-medium" onClick={() => setPaymentHistoryDialogOpen(true)}>
                   View Past Payment
                 </Button>
                 <PaymentHistoryDialog
-                  open={paymentDialogOpen}
-                  onClose={() => setPaymentDialogOpen(false)}
+                  open={paymentHistoryDialogOpen}
+                  onClose={() => setPaymentHistoryDialogOpen(false)}
                   customerId={item.customer.id}
                 />
               </div>
@@ -480,11 +603,17 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
               <Card className="border-gray-200">
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full table-fixed">
+                      <colgroup>
+                        <col className="w-[50%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                      </colgroup>
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Services</th>
-                          <th className="text-left p-4 text-sm font-semibold text-gray-600">Staff:-</th>
+                          <th className="text-left p-4 text-sm font-semibold text-gray-600">Staff</th>
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Visit</th>
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Status</th>
                         </tr>
@@ -494,15 +623,45 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                       <style>{`
                         div::-webkit-scrollbar { display: none; }
                       `}</style>
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
+                      <colgroup>
+                        <col className="w-[50%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                      </colgroup>
                       <tbody className="bg-white">
                         {futureVisits.length > 0 ? (
                           futureVisits.map((appointment) => {
                             const displayStatus = getAppointmentStatus(appointment);
+                            // Get purchases for this appointment
+                            const purchases = appointmentPurchases[appointment.id] || [];
+                            // Extract item names from purchases
+                            const itemNames: string[] = [];
+                            purchases.forEach((purchase: any) => {
+                              if (purchase.details && Array.isArray(purchase.details)) {
+                                purchase.details.forEach((detail: any) => {
+                                  if (detail.itemName) {
+                                    itemNames.push(detail.itemName);
+                                  }
+                                });
+                              }
+                            });
+                            
                             return (
                               <tr key={appointment.id} className="border-b border-gray-100">
-                                <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
-                                <td className="p-4 text-sm">{appointment.staff?.displayName || "Dr. Sahil Behl"}</td>
+                                <td className="p-4 text-sm">
+                                  {itemNames.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {itemNames.map((name, idx) => (
+                                        <div key={idx}>{name}</div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400">No plan purchased</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-sm">{appointment.staff?.displayName || "N/A"}</td>
                                 <td className="p-4 text-sm">{appointment.startAt ? format(utcToIst(appointment.startAt), "MM/dd/yyyy") : "-"}</td>
                                 <td className="p-4">
                                   <Badge className={getStatusBadgeColor(displayStatus)}>
@@ -531,11 +690,17 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
               <Card className="border-gray-200">
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full table-fixed">
+                      <colgroup>
+                        <col className="w-[50%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                      </colgroup>
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Services</th>
-                          <th className="text-left p-4 text-sm font-semibold text-gray-600">Staff:-</th>
+                          <th className="text-left p-4 text-sm font-semibold text-gray-600">Staff</th>
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Visit</th>
                           <th className="text-left p-4 text-sm font-semibold text-gray-600">Status</th>
                         </tr>
@@ -545,14 +710,42 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
                       <style>{`
                         div::-webkit-scrollbar { display: none; }
                       `}</style>
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
+                      <colgroup>
+                        <col className="w-[50%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                      </colgroup>
                       <tbody className="bg-white">
                         {pastVisits.length > 0 ? (
                           pastVisits.map((appointment) => {
                             const displayStatus = getAppointmentStatus(appointment);
+                            const purchases = appointmentPurchases[appointment.id] || [];
+                            const itemNames: string[] = [];
+                            purchases.forEach((purchase: any) => {
+                              if (purchase.details && Array.isArray(purchase.details)) {
+                                purchase.details.forEach((detail: any) => {
+                                  if (detail.itemName) {
+                                    itemNames.push(detail.itemName);
+                                  }
+                                });
+                              }
+                            });
+                            
                             return (
                               <tr key={appointment.id} className="border-b border-gray-100">
-                                <td className="p-4 text-sm">{appointment.service?.name || "Rehab Package"}</td>
+                                <td className="p-4 text-sm">
+                                  {itemNames.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {itemNames.map((name, idx) => (
+                                        <div key={idx}>{name}</div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400">No plan purchased</span>
+                                  )}
+                                </td>
                                 <td className="p-4 text-sm">{appointment.staff?.displayName || "N/A"}</td>
                                 <td className="p-4 text-sm">{appointment.startAt ? format(utcToIst(appointment.startAt), "MM/dd/yyyy") : "-"}</td>
                                 <td className="p-4">
@@ -611,6 +804,85 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
         customer={item.customer}
         onSave={() => {}}
       />
+
+      {/* Record Payment Dialog (Payment-only, no purchase) */}
+      <RecordPaymentDialog
+        open={recordPaymentDialogOpen}
+        onClose={() => {
+          setRecordPaymentDialogOpen(false);
+          setCustomTotal(null);
+          setIsEditingTotal(false);
+        }}
+        defaultAmount={Math.max(0, item.pendingAmount || 0)}
+        onPay={handleRecordPaymentOnly}
+        selectedPackages={[]}
+        selectedServices={[]}
+        totalCalculated={Math.max(0, item.pendingAmount || 0)}
+        customTotal={customTotal}
+        onTotalChange={setCustomTotal}
+        isEditingTotal={isEditingTotal}
+        onEditTotal={setIsEditingTotal}
+        paying={recordingPayment}
+      />
+
+      {/* Manage Walk-in Appointment Dialog */}
+      {item.appointments && item.appointments[0] && (
+        <ManageWalkInAppointmentDialog
+          open={manageWalkInDialogOpen}
+          onClose={() => setManageWalkInDialogOpen(false)}
+          appointment={{
+            id: item.appointments[0].id,
+            staffId: item.appointments[0].staffId,
+            startAt: item.appointments[0].startAt,
+            endAt: item.appointments[0].endAt,
+            customerId: item.customer.id,
+          }}
+          onUpdate={(appointmentId) => {
+            // Mark that an appointment was updated - this will trigger TimeSlots refresh when dialog reopens
+            setAppointmentUpdateTimestamp(Date.now());
+            
+            // Refresh all appointments for this customer (for Future/Past Visits tabs)
+            const fetchAllAppointments = async () => {
+              try {
+                const res = await axiosInstance.get(
+                  `/appointments?customerId=${item.customer.id}`
+                );
+                const appointments = res.data.data || [];
+                setAllAppointments(appointments);
+                
+                // Refresh purchases for each appointment
+                const purchasesMap: Record<string, any[]> = {};
+                await Promise.all(
+                  appointments.map(async (apt: any) => {
+                    if (apt.id) {
+                      try {
+                        const purchaseRes = await axiosInstance.get(
+                          `/purchase?appointmentId=${apt.id}`
+                        );
+                        if (purchaseRes.data?.success && purchaseRes.data.data) {
+                          purchasesMap[apt.id] = purchaseRes.data.data;
+                        }
+                      } catch (err) {
+                        console.error(`Failed to fetch purchases for appointment ${apt.id}:`, err);
+                      }
+                    }
+                  })
+                );
+                setAppointmentPurchases(purchasesMap);
+              } catch (err) {
+                console.error("Error refreshing appointments:", err);
+              }
+            };
+            fetchAllAppointments();
+
+            // Trigger parent refresh (refreshes queue and updates selected item)
+            if (onAppointmentUpdated && appointmentId) {
+              onAppointmentUpdated(appointmentId);
+            }
+          }}
+          appointmentUpdateTimestamp={appointmentUpdateTimestamp}
+        />
+      )}
 
       {/* Prescription Photos Lightbox */}
       {lightboxOpen && prescriptionPhotos.length > 0 && (() => {
@@ -748,15 +1020,21 @@ export default function AppointmentDetailsPanel({ item }: AppointmentDetailsPane
             <div 
               className="flex flex-col items-center"
               onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '95vw', maxHeight: '95vh' }}
+              style={{ maxWidth: '90vw', maxHeight: '90vh' }}
             >
               <img
                 src={getFullPhotoUrl(currentPhoto.imageUrl)}
                 alt="Prescription"
                 className="object-contain"
-                style={{ maxWidth: '95vw', maxHeight: '100vh', width: 'full', height: 'full' }}
+                style={{
+                  width: '80vw',
+                  height: '80vh',
+                  maxWidth: '90vw',
+                  maxHeight: '90vh',
+                }}
                 onError={(e) => {
-                  e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" fill="white" font-size="16">Image not available</text></svg>';
+                  e.currentTarget.src =
+                    'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" fill="white" font-size="16">Image not available</text></svg>';
                 }}
               />
               <div className="mt-4 text-white text-center">

@@ -23,6 +23,8 @@ type AuthContextType = {
   loading: boolean;
   tenantId: string | null;
   login: (username: string, password: string) => Promise<void>;
+  sendPhoneOtp: (phone: string) => Promise<void>;
+  loginWithPhone: (phone: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 };
@@ -144,6 +146,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const sendPhoneOtp = async (phone: string) => {
+    try {
+      const res = await axiosInstance.post('/auth/phone/send-otp', { phone });
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to send OTP');
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Failed to send OTP';
+      throw new Error(msg);
+    }
+  };
+
+  const loginWithPhone = async (phone: string, otp: string) => {
+    try {
+      // Get CSRF token
+      const csrfRes = await axiosInstance.get('/auth/csrf');
+      const { csrfToken } = csrfRes.data;
+
+      // Login with phone OTP - use phone-otp provider
+      const res = await axiosInstance.post('/auth/callback/phone-otp',
+        new URLSearchParams({
+          csrfToken,
+          phone,
+          otp,
+          redirect: 'false',
+          json: 'true',
+        }),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          maxRedirects: 0,
+          validateStatus: status => status < 400
+        }
+      );
+
+      // Check if login was successful
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('Invalid OTP or phone number');
+      }
+
+      // After successful login, fetch the session
+      await refreshSession();
+
+      // Fetch tenant ID by domain
+      const fetchedTenantId = await fetchTenantByDomain();
+      
+      if (fetchedTenantId) {
+        // Set the current tenant ID
+        await axiosInstance.post('/tenant/current', { tenantId: fetchedTenantId });
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Login failed';
+      throw new Error(msg);
+    }
+  };
+
   const logout = async () => {
     try {
       // Get CSRF token for signout
@@ -171,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, tenantId, login, logout, refreshSession }}>
+    <AuthContext.Provider value={{ user, loading, tenantId, login, sendPhoneOtp, loginWithPhone, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
@@ -181,4 +238,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
-}
+} 
