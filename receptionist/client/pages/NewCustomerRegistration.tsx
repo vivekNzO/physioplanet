@@ -4,6 +4,8 @@ import Navbar from '@/components/NavBar';
 import axiosInstance from '@/lib/axios';
 import { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
+import toast from 'react-hot-toast';
 
 // Utility to capitalize the first letter of every word
 function capitalizeWords(str: string) {
@@ -16,10 +18,13 @@ export default function NewCustomerRegistration() {
   const [gender, setGender] = useState('');
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const mobileNumber = location.state?.mobileNumber || '9988776655';
+  const auth = useAuth();
+  const { tenantId } = useAuth();
+  const mobileNumber = location.state?.phone || location.state?.mobileNumber;
+  const otp = location.state?.otp; // OTP from login flow
+  const fromLogin = location.state?.fromLogin || !!otp; // Check if coming from login flow
 
   const [firstName, lastName] = useMemo(() => {
     if (!fullName.trim()) return ['', ''];
@@ -34,25 +39,29 @@ export default function NewCustomerRegistration() {
     // Validation
     const nameRegex = /^[A-Za-zÀ-ÿ'\- ]+$/;
     if (!fullName.trim()) {
-      setError('Full Name is required');
+      toast.error('Full Name is required');
       return;
     }
     if (!nameRegex.test(fullName.trim())) {
-      setError('Full Name must only contain letters, spaces, apostrophes, or hyphens');
+      toast.error('Full Name must only contain letters, spaces, apostrophes, or hyphens');
       return;
     }
-    if (!age || parseInt(age) <= 0) {
-      setError('Age is required and must be greater than 0');
+    const numericAge = parseInt(age, 10);
+    if (!age || Number.isNaN(numericAge)) {
+      toast.error('Age is required and must be a valid number');
+      return;
+    }
+    if (numericAge < 1 || numericAge > 120) {
+      toast.error('Age must be between 1 and 120');
       return;
     }
     if (!gender) {
-      setError('Gender is required');
+      toast.error('Gender is required');
       return;
     }
 
     try {
       setSubmitting(true);
-      setError(null);
 
       const formData = new FormData();
       formData.append('firstName', firstName);
@@ -61,26 +70,66 @@ export default function NewCustomerRegistration() {
       if (profilePhoto) formData.append('photo', profilePhoto);
       if(gender) formData.append('gender', gender);
 
-      const response = await axiosInstance.post('/customers', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const response = await axiosInstance.post('/customers/public', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        },
       });
 
       const createdCustomer = response.data?.data;
       
-      navigate('/book-appointment', {
-        state: { 
-          fullName, 
-          mobileNumber,
-          customerId: createdCustomer?.id,
-          customerExists: true
-        },
-      });
+      if (fromLogin && otp) {
+        try {
+          // Log in the newly created customer using the OTP from initial login
+          const loginResult = await auth.loginWithPhone(mobileNumber, otp);
+          
+          if (loginResult.user) {
+            // Wait a bit for session to be established
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Refresh session to ensure it's available
+            await auth.refreshSession();
+            
+            // Successfully logged in - navigate to welcome page
+            toast.success('Registration successful!');
+            navigate('/welcome-page', {
+              state: {
+                mobileNumber: mobileNumber,
+                fullName: fullName,
+              }
+            });
+            return; // Exit early to prevent further execution
+          } else {
+            // Login didn't return user - show message and redirect
+            toast.success('Registration successful! Please log in.');
+            navigate('/login');
+            return;
+          }
+        } catch (loginErr: any) {
+          // If login fails, show error and redirect to login
+          console.error('Auto-login after registration failed:', loginErr);
+          const errorMsg = loginErr?.response?.data?.error || loginErr?.message || 'Auto-login failed';
+          toast.error(`Registration successful, but ${errorMsg}. Please log in manually.`);
+          navigate('/login');
+          return;
+        }
+      } else {
+        navigate('/book-appointment', {
+          state: { 
+            fullName, 
+            mobileNumber,
+            customerId: createdCustomer?.id,
+            customerExists: true
+          },
+        });
+      }
     } catch (err: any) {
       const message =
         err?.response?.data?.error ||
         err?.message ||
         'Something went wrong while saving the customer.';
-      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -306,11 +355,21 @@ export default function NewCustomerRegistration() {
                       <label>Age</label>
                       <input type='number'
                         value={age}
-                        onChange={(e) => setAge(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Only allow digits
+                          if (value === '' || /^\d+$/.test(value)) {
+                            // Limit to 3 digits (max 120)
+                            if (value === '' || parseInt(value, 10) <= 120) {
+                              setAge(value);
+                            }
+                          }
+                        }}
                         placeholder='Your Age'
                         className='w-full h-[51px] px-[21px] radius-[4px] border border-[#E9EAEB] outline-none
  '
-                        min={0}
+                        min={1}
+                        max={120}
                       />
                     </div>
                     <div className='flex flex-col w-1/2 gap-[10px] color-[#0d0d0d] text-sm' >
@@ -392,11 +451,6 @@ export default function NewCustomerRegistration() {
                 gap: '17px',
                 flexWrap: 'wrap',
               }}>
-                {error && (
-                  <div className='text-red-600 text-sm'>
-                    {error}
-                  </div>
-                )}
                 <button
                   onClick={() => navigate(-1)}
                   style={{

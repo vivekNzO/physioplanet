@@ -13,5 +13,21 @@ const axiosInstance = axios.create({
   },
 });
 
+// Module-level variable to store tenantId (updated from AuthContext)
+let currentTenantId: string | null = null;
+
+// Function to set tenantId (called from AuthContext)
+export function setTenantIdForAxios(tenantId: string | null) {
+  currentTenantId = tenantId;
+}
+
+// Add tenant ID to all requests via interceptor
+axiosInstance.interceptors.request.use((config) => {
+  if (currentTenantId) {
+    config.headers['x-tenant-id'] = currentTenantId;
+  }
+  return config;
+});
+
 export default axiosInstance;
 

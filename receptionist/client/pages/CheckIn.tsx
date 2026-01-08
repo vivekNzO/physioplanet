@@ -31,6 +31,7 @@ export default function CheckIn() {
       // Check if customer exists
       const res = await axiosInstance.get('/customers', {
         params: { phone: mobileNumber, limit: 1 },
+        headers: { ...(tenantId ? { 'x-tenant-id': tenantId } : {}) },
       });
 
       const data = res?.data?.data ?? [];

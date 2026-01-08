@@ -169,16 +169,16 @@ export default function NewCustomerRegistration() {
               gap: '17px',
             }}>
               <div style={{
-              width: '59px',
-              height: '59px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: '29.5px',
+                width: '59px',
+                height: '59px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderRadius: '29.5px',
               overflow: 'hidden',
-              background: profilePhoto ? 'transparent' :  'linear-gradient(180deg, #0557A8 0%, #1BB7E9 100%)',
+                background: profilePhoto ? 'transparent' :  'linear-gradient(180deg, #0557A8 0%, #1BB7E9 100%)',
               }}>
-              {profilePhoto ? (
+                {profilePhoto ? (
                   <img
                     src={URL.createObjectURL(profilePhoto)}
                     alt='profile'

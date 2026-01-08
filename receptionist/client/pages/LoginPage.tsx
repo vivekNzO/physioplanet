@@ -93,8 +93,53 @@ function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await auth.loginWithPhone(phone, otpString)
-      navigate('/')
+      const result = await auth.loginWithPhone(phone, otpString)
+      
+      // Check if registration is required
+      if (result.requiresRegistration) {
+        // Redirect to new customer registration with phone number and OTP for auto-login
+        navigate('/new-customer-registration', {
+          state: { 
+            phone: result.phone || phone,
+            otp: otpString, // Pass OTP for auto-login after registration
+            fromLogin: true
+          }
+        })
+        return
+      }
+
+      // If user exists, check role
+      if (result.user) {
+        const roleName = result.user.role?.name?.toLowerCase()
+        const isCustomer = result.user.isCustomer || roleName === 'customer'
+        
+        // Debug logging
+        console.log('[LoginPage] Login result:', {
+          roleName,
+          isCustomer,
+          userRole: result.user.role,
+          fullUser: result.user
+        })
+        
+        if (isCustomer || roleName === 'customer') {
+          // Customer login - go to welcome page
+          console.log('[LoginPage] Redirecting customer to welcome page')
+          navigate('/welcome-page', {
+            state: {
+              mobileNumber: result.user.phone || phone,
+              fullName: result.user.name || 'Customer',
+            }
+          })
+        } else {
+          // Non-customer (staff/admin) - go to check-in page
+          console.log('[LoginPage] Redirecting non-customer to check-in page')
+          navigate('/')
+        }
+      } else {
+        // Fallback to check-in page
+        console.log('[LoginPage] No user in result, redirecting to check-in page')
+        navigate('/')
+      }
     } catch (err: any) {
       setError(err?.message || 'Login failed')
     } finally {
@@ -149,130 +194,49 @@ function LoginPage() {
               gap: '50px',
             }}>
               {/* Header Section */}
-              <div style={{
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '20px',
-              }}>
-                <h1 style={{
-                  color: '#1D5287',
-                  textAlign: 'center',
-                  fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                  fontSize: '36px',
-                  fontWeight: 700,
-                  lineHeight: '100%',
-                  margin: 0,
-                }}>
-                  <span style={{fontWeight: 400, color: '#0D0D0D'}}>LOG </span>
-                  <span style={{fontWeight: 700, color: '#1D5287'}}>IN</span>
-                </h1>
-                <p style={{
-                  color: '#0D0D0D',
-                  textAlign: 'center',
-                  fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  margin: 0,
-                }}>
-                  Sign in with your phone number and OTP
-                </p>
-              </div>
-
-              {/* Form Section */}
-              <div style={{
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-end',
-                gap: '25px',
-              }}>
-                {/* Phone Input */}
+              {!otpSent ? (
                 <div style={{
                   width: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  position: 'relative',
+                  alignItems: 'center',
+                  gap: '20px',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      color: '#0D0D0D',
-                      fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                      fontSize: '14px',
-                      fontWeight: 400,
-                      lineHeight:1
-                    }}>
-                      Phone Number
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 10)
-                        setPhone(val)
-                        setOtpSent(false)
-                        setOtp(["", "", "", "", "", ""])
-                        setError(null)
-                      }}
-                      placeholder="Enter 10-digit phone number"
-                      disabled={otpSent}
-                      style={{
-                        flex: 1,
-                        height: '51px',
-                        padding: '0 17px',
-                        borderRadius: '4px',
-                        border: '1px solid #E9EAEB',
-                        background: otpSent ? '#F5F5F5' : '#FFF',
-                        color: '#0D0D0D',
-                        fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                        fontSize: '14px',
-                        fontWeight: 400,
-                        outline: 'none',
-                      }}
-                      onKeyDown={(e) => e.key === 'Enter' && !otpSent && phone.length === 10 && handleSendOtp()}
-                    />
-                    {!otpSent && (
-                      <button
-                        onClick={handleSendOtp}
-                        disabled={phone.length !== 10 || sendingOtp}
-                        style={{
-                          padding: '0 20px',
-                          height: '51px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          background: phone.length === 10 && !sendingOtp
-                            ? 'linear-gradient(90deg, #75B640 0%, #52813C 100%)'
-                            : '#CCC',
-                          color: '#FFF',
-                          fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                          fontSize: '14px',
-                          fontWeight: 600,
-                          cursor: phone.length === 10 && !sendingOtp ? 'pointer' : 'not-allowed',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {sendingOtp ? <Loader className='animate-spin' size={16} /> : 'Send OTP'}
-                      </button>
-                    )}
-                  </div>
-                  {error && !otpSent && (
-                    <div style={{
-                      color: '#DC2626',
-                      fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                      fontSize: '14px',
-                    }}>
-                      {error}
-                    </div>
-                  )}
+                  <h1 style={{
+                    color: '#1D5287',
+                    textAlign: 'center',
+                    fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                    fontSize: '36px',
+                    fontWeight: 700,
+                    lineHeight: '100%',
+                    margin: 0,
+                  }}>
+                    <span style={{fontWeight: 400, color: '#0D0D0D'}}>LOG </span>
+                    <span style={{fontWeight: 700, color: '#1D5287'}}>IN</span>
+                  </h1>
+                  <p style={{
+                    color: '#0D0D0D',
+                    textAlign: 'center',
+                    fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    margin: 0,
+                  }}>
+                    Enter your mobile number to get started
+                  </p>
                 </div>
+              ) : null}
 
-                {/* OTP Input */}
-                {otpSent && (
+              {/* Form Section */}
+              {!otpSent ? (
+                <div style={{
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  gap: '25px',
+                }}>
+                  {/* Phone Input */}
                   <div style={{
                     width: '100%',
                     display: 'flex',
@@ -281,7 +245,23 @@ function LoginPage() {
                     gap: '10px',
                     position: 'relative',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}>
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                        <g clipPath="url(#clip0_236_169)">
+                          <path d="M16.8947 12.7091C16.8649 12.6844 13.4921 10.2847 12.5814 10.4316C12.1421 10.5092 11.8913 10.809 11.3878 11.4086C11.3068 11.5054 11.1116 11.7366 10.9609 11.9014C10.6427 11.7977 10.3323 11.6714 10.0322 11.5234C8.48279 10.7691 7.23093 9.51721 6.47662 7.96781C6.32861 7.66767 6.20229 7.35732 6.09863 7.03912C6.264 6.88781 6.49575 6.69263 6.59475 6.60938C7.19156 6.10875 7.49081 5.85731 7.56844 5.41744C7.72762 4.50675 5.31563 1.13512 5.29087 1.10475C5.18103 0.948969 5.03797 0.81952 4.87202 0.725747C4.70607 0.631974 4.52137 0.576217 4.33125 0.5625C3.35362 0.5625 0.5625 4.18275 0.5625 4.79306C0.5625 4.8285 0.613688 8.43075 5.05575 12.9493C9.56925 17.3863 13.1715 17.4375 13.2069 17.4375C13.8167 17.4375 17.4375 14.6464 17.4375 13.6687C17.4236 13.4786 17.3678 13.2939 17.2739 13.128C17.18 12.962 17.0505 12.819 16.8947 12.7091ZM13.1445 16.3091C12.6562 16.2675 9.63 15.8687 5.85 12.1556C2.11894 8.35706 1.73025 5.32575 1.69144 4.85606C2.42875 3.6988 3.3192 2.64657 4.33856 1.728C4.36106 1.7505 4.39088 1.78425 4.42913 1.82812C5.2109 2.89532 5.88436 4.03778 6.4395 5.23856C6.25897 5.42018 6.06816 5.59127 5.868 5.751C5.55761 5.9875 5.27258 6.25556 5.0175 6.55087C4.97434 6.61143 4.94361 6.67995 4.9271 6.75246C4.91059 6.82497 4.90862 6.90004 4.92131 6.97331C5.04035 7.48897 5.22267 7.98794 5.46412 8.45888C6.32919 10.2353 7.76462 11.6705 9.54113 12.5353C10.012 12.7771 10.511 12.9596 11.0267 13.0787C11.1 13.0917 11.1751 13.0898 11.2476 13.0733C11.3202 13.0568 11.3887 13.0259 11.4491 12.9825C11.7455 12.7264 12.0145 12.4402 12.2518 12.1286C12.4284 11.9183 12.6641 11.6376 12.7536 11.5583C13.9574 12.1129 15.1024 12.7871 16.1713 13.5709C16.218 13.6102 16.2512 13.6406 16.2731 13.6603C15.3545 14.68 14.3021 15.5707 13.1445 16.308V16.3091Z" fill="#1D5287"/>
+                          <path d="M12.9375 8.4375H14.0625C14.0612 7.24444 13.5866 6.10062 12.743 5.257C11.8994 4.41338 10.7556 3.93884 9.5625 3.9375V5.0625C10.4573 5.06339 11.3153 5.41926 11.948 6.052C12.5807 6.68474 12.9366 7.54267 12.9375 8.4375Z" fill="#1D5287"/>
+                          <path d="M15.75 8.4375H16.875C16.8728 6.49879 16.1016 4.64012 14.7308 3.26925C13.3599 1.89837 11.5012 1.12723 9.5625 1.125V2.25C11.2029 2.25194 12.7756 2.90445 13.9356 4.06441C15.0955 5.22438 15.7481 6.79707 15.75 8.4375Z" fill="#1D5287"/>
+                        </g>
+                        <defs>
+                          <clipPath id="clip0_236_169">
+                            <rect width="18" height="18" fill="white"/>
+                          </clipPath>
+                        </defs>
+                      </svg>
                       <div style={{
                         color: '#0D0D0D',
                         fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
@@ -289,77 +269,204 @@ function LoginPage() {
                         fontWeight: 400,
                         lineHeight:1
                       }}>
-                        Enter the 6-digit OTP sent to {phone}
+                        Mobile Number (India)
                       </div>
-
                     </div>
-                    <div style={{
-                      display: 'flex',
-                      gap: '10px',
-                      width: '100%',
-                      justifyContent: 'center',
-                    }}>
-                      {otp.map((digit, index) => (
-                        <input
-                          key={index}
-                          ref={(el) => (otpRefs.current[index] = el)}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleOtpChange(index, e.target.value)}
-                          onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                          onPaste={index === 0 ? handleOtpPaste : undefined}
-                          style={{
-                            width: '50px',
-                            height: '50px',
-                            borderRadius: '4px',
-                            border: '1px solid #E9EAEB',
-                            background: '#FFF',
-                            color: '#0D0D0D',
-                            fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                            fontSize: '24px',
-                            fontWeight: 600,
-                            outline: 'none',
-                            textAlign: 'center',
-                            padding: 0,
-                          }}
-                          autoFocus={index === 0 && otpSent}
-                        />
-                      ))}
-                    </div>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      value={phone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10)
+                        setPhone(val)
+                        setOtpSent(false)
+                        setOtp(["", "", "", "", "", ""])
+                        setError(null)
+                      }}
+                      placeholder="Enter 10-digit mobile number"
+                      style={{
+                        width: '100%',
+                        height: '51px',
+                        padding: '0 17px',
+                        borderRadius: '4px',
+                        border: '1px solid #E9EAEB',
+                        background: '#FFF',
+                        color: '#0D0D0D',
+                        fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                        fontSize: '14px',
+                        fontWeight: 400,
+                        outline: 'none',
+                      }}
+                      onKeyDown={(e) => e.key === 'Enter' && phone.length === 10 && handleSendOtp()}
+                    />
                     {error && (
                       <div style={{
                         color: '#DC2626',
                         fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
                         fontSize: '14px',
-                        width: '100%',
-                        textAlign: 'center',
                       }}>
                         {error}
                       </div>
                     )}
-                    <button
-                        onClick={handleResendOtp}
-                        disabled={sendingOtp}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#1D5287',
-                          fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          cursor: sendingOtp ? 'not-allowed' : 'pointer',
-                          textDecoration: 'underline',
-                        }}
-                      >
-                        {sendingOtp ? 'Sending...' : 'Resend OTP'}
-                      </button>
                   </div>
-                )}
 
-                {/* Continue Button */}
-                {otpSent && (
+                  {/* Tip Box */}
+                  <div style={{
+                    width: '100%',
+                    padding: '20px 15.5px',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderRadius: '4px',
+                    border: '0.5px solid #C0EDFC',
+                    background: '#E3F6FC',
+                  }}>
+                    <p style={{
+                      color: '#0D0D0D',
+                      textAlign: 'center',
+                      fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                      fontSize: '12px',
+                      fontWeight: 400,
+                      margin: 0,
+                      lineHeight: '1.4',
+                    }}>
+                      <span style={{fontSize: '16px'}}>💡</span> Tip: If you're a new Customer, you'll need to provide some basic information after this step.
+                    </p>
+                  </div>
+
+                  {/* Continue Button */}
+                  <button
+                    onClick={handleSendOtp}
+                    disabled={phone.length !== 10 || sendingOtp}
+                    style={{
+                      width: '100%',
+                      height: '51px',
+                      padding: '14px 116px',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: '7px',
+                      borderRadius: '4px',
+                      background: phone.length === 10 && !sendingOtp
+                        ? 'linear-gradient(90deg, #75B640 0%, #52813C 100%)'
+                        : 'linear-gradient(90deg, #a0a0a0 0%, #808080 100%)',
+                      border: 'none',
+                      cursor: phone.length === 10 && !sendingOtp ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.3s ease',
+                    }}>
+                    {sendingOtp ? (
+                      <span className='flex items-center justify-center'><Loader className='animate-spin'/></span>
+                    ) : (
+                      <>
+                        <span style={{
+                          color: '#FFF',
+                          textAlign: 'center',
+                          fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          textTransform: 'capitalize',
+                        }}>
+                          Continue
+                        </span>
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                          <g clipPath="url(#clip0_236_183)">
+                            <path d="M0.781372 7.41249C0.834565 7.42112 0.888397 7.4251 0.942258 7.4244L10.1135 7.42441L9.91352 7.51742C9.71804 7.60994 9.54021 7.73586 9.38799 7.88948L6.81614 10.4613C6.47742 10.7847 6.42051 11.3048 6.68127 11.6938C6.98476 12.1082 7.56677 12.1982 7.98126 11.8947C8.01475 11.8702 8.04657 11.8435 8.07648 11.8147L12.7272 7.16396C13.0907 6.80092 13.091 6.21199 12.7279 5.84854C12.7277 5.84831 12.7274 5.84805 12.7272 5.84781L8.07649 1.1971C7.71274 0.83437 7.12382 0.835184 6.76106 1.19893C6.73252 1.22756 6.70586 1.25802 6.68127 1.29011C6.42051 1.67906 6.47742 2.19921 6.81614 2.52255L9.38334 5.09905C9.51981 5.23566 9.67671 5.35021 9.84841 5.43855L10.1275 5.56412L0.993445 5.56412C0.518286 5.54647 0.101408 5.87839 0.0121436 6.34544C-0.070087 6.85251 0.274299 7.33023 0.781372 7.41249Z" fill="white"/>
+                          </g>
+                          <defs>
+                            <clipPath id="clip0_236_183">
+                              <rect width="13" height="13" fill="white" transform="translate(13 13) rotate(-180)"/>
+                            </clipPath>
+                          </defs>
+                        </svg>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                /* OTP Verification Section */
+                <div style={{
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '30px',
+                }}>
+                  {/* Title */}
+                  <h1 style={{
+                    color: '#1D5287',
+                    textAlign: 'center',
+                    fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                    fontSize: '36px',
+                    fontWeight: 700,
+                    lineHeight: '100%',
+                    margin: 0,
+                  }}>
+                    <span style={{fontWeight: 400, color: '#0D0D0D'}}>Verify Your </span>
+                    <span style={{fontWeight: 700, color: '#1D5287'}}>Mobile Number</span>
+                  </h1>
+
+                  {/* Instructions */}
+                  <p style={{
+                    color: '#0D0D0D',
+                    textAlign: 'center',
+                    fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    margin: 0,
+                  }}>
+                    Enter the 6-digit OTP sent to {phone}
+                  </p>
+
+                  {/* OTP Input Boxes */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    width: '100%',
+                    justifyContent: 'center',
+                  }}>
+                    {otp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => (otpRefs.current[index] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                        onPaste={index === 0 ? handleOtpPaste : undefined}
+                        style={{
+                          width: '50px',
+                          height: '50px',
+                          borderRadius: '4px',
+                          border: '1px solid #E9EAEB',
+                          background: '#FFF',
+                          color: '#0D0D0D',
+                          fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                          fontSize: '24px',
+                          fontWeight: 600,
+                          outline: 'none',
+                          textAlign: 'center',
+                          padding: 0,
+                        }}
+                        autoFocus={index === 0 && otpSent}
+                      />
+                    ))}
+                  </div>
+
+                  {error && (
+                    <div style={{
+                      color: '#DC2626',
+                      fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                      fontSize: '14px',
+                      width: '100%',
+                      textAlign: 'center',
+                    }}>
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Verify OTP Button */}
                   <button
                     onClick={() => handlePhoneLogin()}
                     disabled={otp.join('').length !== 6 || loading}
@@ -406,8 +513,63 @@ function LoginPage() {
                       </>
                     )}
                   </button>
-                )}
-              </div>
+
+                  {/* Secondary Action Buttons */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    width: '100%',
+                  }}>
+                    <button
+                      onClick={() => {
+                        setOtpSent(false)
+                        setOtp(["", "", "", "", "", ""])
+                        setError(null)
+                      }}
+                      style={{
+                        flex: 1,
+                        height: '51px',
+                        padding: '14px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderRadius: '4px',
+                        border: '1px solid #E9EAEB',
+                        background: '#FFF',
+                        color: '#0D0D0D',
+                        fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                      }}>
+                      Change
+                    </button>
+                    <button
+                      onClick={handleResendOtp}
+                      disabled={sendingOtp}
+                      style={{
+                        flex: 1,
+                        height: '51px',
+                        padding: '14px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderRadius: '4px',
+                        border: '1px solid #E9EAEB',
+                        background: '#FFF',
+                        color: '#0D0D0D',
+                        fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        cursor: sendingOtp ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.3s ease',
+                      }}>
+                      {sendingOtp ? 'Sending...' : 'Resend OTP'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

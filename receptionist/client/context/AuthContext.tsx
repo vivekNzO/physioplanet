@@ -1,6 +1,7 @@
 // src/context/AuthContext.tsx
 import { createContext, useContext, useEffect, useState } from "react";
 import axiosInstance from "@/lib/axios";
+import { setTenantIdForAxios } from "@/lib/axios";
 
 type Role = {
   id: string;
@@ -16,15 +17,24 @@ type User = {
   role?: Role;
   image?: string;
   currentTenantId?: string;
+  phone?: string;
+  isCustomer?: boolean;
+};
+
+type LoginResult = {
+  requiresRegistration?: boolean;
+  phone?: string;
+  user?: User;
 };
 
 type AuthContextType = {
   user: User | null;
+  role: Role | null;
   loading: boolean;
   tenantId: string | null;
   login: (username: string, password: string) => Promise<void>;
   sendPhoneOtp: (phone: string) => Promise<void>;
-  loginWithPhone: (phone: string, otp: string) => Promise<void>;
+  loginWithPhone: (phone: string, otp: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 };
@@ -65,34 +75,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (res.data?.success && res.data?.tenantId) {
         setTenantId(res.data.tenantId);
-        localStorage.setItem('tenantId', res.data.tenantId);
+        setTenantIdForAxios(res.data.tenantId); // Update axios interceptor
         return res.data.tenantId;
       }
     } catch (error) {
       console.error('Error fetching tenant by domain:', error);
-      // Fallback to localStorage if available
-      const storedTenantId = localStorage.getItem('tenantId');
-      if (storedTenantId) {
-        setTenantId(storedTenantId);
-        return storedTenantId;
-      }
     }
     const fallbackTenantId = 'cmi7et46x0000pj2zmdsp82rm';
     setTenantId(fallbackTenantId);
-    localStorage.setItem('tenantId', fallbackTenantId);
+    setTenantIdForAxios(fallbackTenantId); // Update axios interceptor
     return fallbackTenantId;
   };
 
   const refreshSession = async () => {
     try {
       const res = await axiosInstance.get("/auth/session");
-      setUser(res.data?.user ?? null);
+      const userData = res.data?.user ?? null;
+      setUser(userData);
+      
+      // Console log user/customer info for debugging and conditional rendering
+      if (userData) {
+        const roleName = userData.role?.name || 'Unknown';
+        const isCustomer = userData.isCustomer || roleName === 'customer';
+      } else {
+        console.log('[AuthContext] No user session found');
+      }
       
       // If tenant ID is not set yet, try to get it from session or fetch by domain
       if (!tenantId) {
         const sessionTenantId = res.data?.user?.currentTenantId;
         if (sessionTenantId) {
           setTenantId(sessionTenantId);
+          setTenantIdForAxios(sessionTenantId); // Update axios interceptor
         } else {
           await fetchTenantByDomain();
         }
@@ -140,6 +154,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Set the current tenant ID
         await axiosInstance.post('/tenant/current', { tenantId: fetchedTenantId });
       }
+      
+      // Console log for credential login
+      const sessionRes = await axiosInstance.get("/auth/session");
+      if (sessionRes.data?.user) {
+        const userData = sessionRes.data.user;
+        const roleName = userData.role?.name || 'Unknown';
+
+      }
     } catch (err: any) {
       const msg = err?.message || 'Login failed';
       throw new Error(msg);
@@ -158,43 +180,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithPhone = async (phone: string, otp: string) => {
+  const loginWithPhone = async (phone: string, otp: string): Promise<LoginResult> => {
     try {
-      // Get CSRF token
-      const csrfRes = await axiosInstance.get('/auth/csrf');
-      const { csrfToken } = csrfRes.data;
+      // Call verify-otp API directly
+      const res = await axiosInstance.post('/auth/phone/verify-otp', { phone, otp });
 
-      // Login with phone OTP - use phone-otp provider
-      const res = await axiosInstance.post('/auth/callback/phone-otp',
-        new URLSearchParams({
-          csrfToken,
-          phone,
-          otp,
-          redirect: 'false',
-          json: 'true',
-        }),
-        {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          maxRedirects: 0,
-          validateStatus: status => status < 400
+      // Check if registration is required
+      if (res.data?.requiresRegistration) {
+        return {
+          requiresRegistration: true,
+          phone: res.data.phone,
+        };
+      }
+
+      // If user data is returned, proceed with login
+      if (res.data?.success && res.data?.user) {
+        const userData = res.data.user;
+
+        // Get CSRF token for NextAuth session creation
+        const csrfRes = await axiosInstance.get('/auth/csrf');
+        const { csrfToken } = csrfRes.data;
+
+        // Create NextAuth session using phone-otp provider
+        try {
+          await axiosInstance.post('/auth/callback/phone-otp',
+            new URLSearchParams({
+              csrfToken,
+              phone,
+              otp,
+              redirect: 'false',
+              json: 'true',
+            }),
+            {
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              maxRedirects: 0,
+              validateStatus: status => status < 400
+            }
+          );
+        } catch (callbackErr: any) {
+          // If NextAuth callback fails, throw error
+          const errorMsg = callbackErr?.response?.data?.error || callbackErr?.message || 'Failed to create session';
+          throw new Error(errorMsg);
         }
-      );
 
-      // Check if login was successful
-      if (res.status === 401 || res.status === 403) {
-        throw new Error('Invalid OTP or phone number');
+        // After successful login, fetch the session
+        await refreshSession();
+
+        // Fetch tenant ID by domain
+        const fetchedTenantId = await fetchTenantByDomain();
+        
+        if (fetchedTenantId) {
+          // Set the current tenant ID
+          await axiosInstance.post('/tenant/current', { tenantId: fetchedTenantId });
+        }
+
+        // Console log for phone OTP login
+        const roleName = userData.role?.name || 'Unknown';
+        const isCustomer = userData.isCustomer || roleName === 'customer';
+        console.log('[AuthContext] Phone OTP login successful:', {
+          id: userData.id,
+          name: userData.name,
+          phone: userData.phone,
+          role: roleName,
+          isCustomer: isCustomer,
+          currentTenantId: userData.currentTenantId,
+        });
+
+        return {
+          user: userData,
+          requiresRegistration: false,
+        };
       }
 
-      // After successful login, fetch the session
-      await refreshSession();
-
-      // Fetch tenant ID by domain
-      const fetchedTenantId = await fetchTenantByDomain();
-      
-      if (fetchedTenantId) {
-        // Set the current tenant ID
-        await axiosInstance.post('/tenant/current', { tenantId: fetchedTenantId });
-      }
+      throw new Error('Invalid response from server');
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Login failed';
       throw new Error(msg);
@@ -220,15 +278,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      // Always clear local state and localStorage
+      // Always clear local state
       setUser(null);
       setTenantId(null);
-      localStorage.removeItem('tenantId');
+      setTenantIdForAxios(null); // Clear tenantId from axios interceptor
     }
   };
 
+  // Compute role from user for easier access
+  const role = user?.role || null;
+
   return (
-    <AuthContext.Provider value={{ user, loading, tenantId, login, sendPhoneOtp, loginWithPhone, logout, refreshSession }}>
+    <AuthContext.Provider value={{ user, role, loading, tenantId, login, sendPhoneOtp, loginWithPhone, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

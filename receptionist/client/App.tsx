@@ -32,24 +32,26 @@ const queryClient = new QueryClient();
 
 // Create a new component that uses useAuth
 function AppRoutes() {
-  const { user, loading,tenantId } = useAuth();  
+  const { user, role, loading, tenantId } = useAuth();  
   if (loading) return <IndexSkeleton/>
   
+  // Check if user is a customer
+  const isCustomer = user?.role?.name?.toLowerCase() === 'customer'
   return (
     <Routes>
-      <Route path="/login" element={!user? <LoginPage/> : <Navigate to={"/"}/>}/>
-      <Route path="/" element={user?<Index />:<Navigate to={"/login"}/>} />
-      <Route path="/check-in" element={user?<CheckIn /> : <Navigate to={"/login"}/>} />
-      <Route path="/new-customer-registration" element={user?<NewCustomerRegistration />:<Navigate to={"/login"}/>} />
+      <Route path="/login" element={!user? <LoginPage/> : (isCustomer ? <Navigate to={"/welcome-page"}/> : <Navigate to={"/"}/>)}/>
+      <Route path="/" element={user? (isCustomer ? <Navigate to={"/welcome-page"}/> : <Index />) : <Navigate to={"/login"}/>} />
+      <Route path="/check-in" element={user&&!isCustomer?<CheckIn /> : <Navigate to={"/login"}/>} />
+      <Route path="/new-customer-registration" element={<NewCustomerRegistration />} />
       <Route path="/verify-appointment-otp" element={user?<VerifyAppointmentOTP/>:<Navigate to={"/login"}/>} />
       <Route path="/verify-otp" element={user?<VerifyOTP />:<Navigate to={"/login"}/>} />
       <Route path="/verification-success" element={user?<VerificationSuccess />:<Navigate to={"/login"}/>} />
       <Route path="/patient-dashboard" element={<PatientDashboard />} />
-      <Route path="/book-appointment" element={user?<BookAppointment />:<Navigate to={"/login"}/>} />
-      <Route path="/customer-records" element={user?<CustomerRecords />:<Navigate to={"/login"}/>} />
-      <Route path="/reception-dashboard" element={user?<ReceptionDashboard />:<Navigate to={"/login"}/>} />
+      <Route path="/book-appointment" element={user&&!isCustomer?<BookAppointment />:<Navigate to={"/login"}/>} />
+      <Route path="/customer-records" element={user&&!isCustomer?<CustomerRecords />:<Navigate to={"/login"}/>} />
+      <Route path="/reception-dashboard" element={user&&!isCustomer?<ReceptionDashboard />:<Navigate to={"/login"}/>} />
       <Route path="/whatsapp-confirmation" element={<WhatsAppConfirmation />} />
-      <Route path="/welcome-page" element={<WelcomePage />} />
+      <Route path="/welcome-page" element={user&&isCustomer?<WelcomePage />:<Navigate to={"/login"}/>} />
       <Route path="/customer-profile" element={user?<CustomerProfile />:<Navigate to={"/login"}/>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
