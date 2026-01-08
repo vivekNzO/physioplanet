@@ -25,31 +25,24 @@ export const getStatusFromTimes = (
 ): "Waiting" | "In Exercise" | "Completed" => {
   const now = new Date()
   
-  // If no startAt, always WAITING
   if (!startAt) {
     return "Waiting"
   }
   
   const appointmentStart = new Date(startAt)
-  
-  // Before start time → WAITING
-  if (now < appointmentStart) {
+    if (now < appointmentStart) {
     return "Waiting"
   }
-  
-  // If no endAt, check if we're past start → IN_EXERCISE
-  if (!endAt) {
+    if (!endAt) {
     return "In Exercise"
   }
   
   const appointmentEnd = new Date(endAt)
-  
-  // During appointment time → IN_EXERCISE
+
   if (now >= appointmentStart && now <= appointmentEnd) {
     return "In Exercise"
   }
   
-  // After end time → COMPLETED
   return "Completed"
 }
 

@@ -36,7 +36,8 @@ interface Appointment {
   staffId: string;
   serviceId: string;
   customerId: string;
-  startAt: string;
+  startAt: string | null;
+  endAt?: string | null;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
   price: number;
   currency: string;
@@ -173,8 +174,7 @@ function CustomerRecords() {
             : "...................";
 
           // Use dynamic status based on startAt and endAt times
-          // If it's cancelled in the backend, respect that
-          let status: string;
+          let status: "In Exercise" | "Waiting" | "Completed" | "Cancelled";
           if (apt.status === "CANCELLED") {
             status = "Cancelled";
           } else {
@@ -238,7 +238,7 @@ function CustomerRecords() {
             
             // Use dynamic status based on startAt and endAt times
             // If it's cancelled in the backend, respect that
-            let status: string;
+            let status: "In Exercise" | "Waiting" | "Completed" | "Cancelled";
             if (apt.status === "CANCELLED") {
               status = "Cancelled";
             } else {

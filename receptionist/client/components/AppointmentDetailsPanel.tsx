@@ -212,7 +212,6 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
     // If status is CANCELLED (manually set), return it
     if (appointment.status === "CANCELLED") return "Cancelled";
     
-    // Otherwise, determine status based on startAt and endAt times
     const autoStatus = getStatusFromTimes(appointment.startAt, appointment.endAt);
     return autoStatus;
   };

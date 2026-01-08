@@ -51,7 +51,6 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
         return `${month}/${day}/${year} ${hours12}:${minutes}:${seconds} ${ampm}`;
       };
       const date = payment.createdAt ? formatDateForCSV(payment.createdAt) : 'N/A';
-      // Format amount as plain number (convert Decimal to number, remove any formatting)
       const amountValue = payment.amount ? (typeof payment.amount === 'string' ? parseFloat(payment.amount) : Number(payment.amount)) : 0;
       const amount = amountValue.toFixed(2); // Format to 2 decimal places
       const mode = payment.mode || 'N/A';
@@ -61,7 +60,6 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
       // Escape commas and quotes in CSV
       const escapeCSV = (str: string, alwaysQuote: boolean = false) => {
         const strValue = String(str);
-        // Always quote if it contains commas, quotes, newlines, or spaces (for dates)
         if (alwaysQuote || strValue.includes(',') || strValue.includes('"') || strValue.includes('\n') || strValue.includes(' ')) {
           return `"${strValue.replace(/"/g, '""')}"`;
         }
@@ -69,10 +67,10 @@ export default function PaymentHistoryDialog({ open, onClose, customerId }: Paym
       };
       
       return [
-        escapeCSV(date, true), // Always quote dates since they contain spaces
+        escapeCSV(date, true), 
         escapeCSV(amount),
         escapeCSV(mode),
-        escapeCSV(itemsStr, true), // Always quote items since they may contain spaces and semicolons
+        escapeCSV(itemsStr, true),
         escapeCSV(status)
       ].join(',');
     });
