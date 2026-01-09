@@ -188,7 +188,7 @@ export default function SellPlanDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[820px] max-h-[90vh] overflow-y-auto p-6">
+      <DialogContent className="max-w-[820px] max-[1023px]:max-w-[672px] max-h-[90vh] overflow-y-auto p-6">
         {!showPayment ? (
           <>
             <h2 className="text-3xl text-center mb-6">

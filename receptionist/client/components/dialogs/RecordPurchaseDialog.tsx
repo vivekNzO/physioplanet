@@ -145,7 +145,7 @@ export default function RecordPurchaseDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-        <DialogContent className="max-w-[801px] max-h-[90vh] overflow-y-auto px-[99px] pt-[29px] pb-[55px] rounded-lg">
+        <DialogContent className="max-w-[801px] max-[1023px]:max-w-[672px] max-h-[90vh] overflow-y-auto px-[99px] pt-[29px] pb-[55px] rounded-lg">
         <h2 className="text-4xl text-center mb-6">
           Record <span className="text-[#1D5287] font-bold">Payments</span>
         </h2>

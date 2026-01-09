@@ -398,7 +398,7 @@ export default function BookNewAppointmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl py-[64.5px] px-[68.5px]">
+      <DialogContent className="max-w-2xl max-[1023px]:max-w-[672px] py-[64.5px] px-[68.5px]">
         <DialogHeader>
           <DialogTitle className="text-[36px] font-normal text-center">
             Book New <span className="text-[#1D5287] font-bold">Appointment</span>

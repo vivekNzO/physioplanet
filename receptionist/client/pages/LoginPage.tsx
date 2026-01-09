@@ -172,7 +172,7 @@ function LoginPage() {
         }}>
 
           {/* Main Card */}
-          <div style={{
+          <div className="max-lg:min-w-[400px]" style={{
             width: '100%',
             padding: '80px 52px',
             display: 'flex',
@@ -333,10 +333,10 @@ function LoginPage() {
                   <button
                     onClick={handleSendOtp}
                     disabled={phone.length !== 10 || sendingOtp}
+                    className="px-6 py-3.5"
                     style={{
                       width: '100%',
                       height: '51px',
-                      padding: '14px 116px',
                       display: 'flex',
                       justifyContent: 'center',
                       alignItems: 'center',
@@ -465,10 +465,10 @@ function LoginPage() {
                   <button
                     onClick={() => handlePhoneLogin()}
                     disabled={otp.join('').length !== 6 || loading}
+                    className="px-6 py-3.5"
                     style={{
                       width: '100%',
                       height: '51px',
-                      padding: '14px 116px',
                       display: 'flex',
                       justifyContent: 'center',
                       alignItems: 'center',

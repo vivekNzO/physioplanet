@@ -152,20 +152,20 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 p-4 cursor-pointer transition-all hover:bg-gray-50 border-b border-gray-100 ${
+      className={`flex items-center gap-3 max-[1023px]:gap-2 max-[870px]:gap-1.5 p-4 max-[1023px]:p-2.5 max-[870px]:p-2 max-lg:p-2 cursor-pointer transition-all hover:bg-gray-50 border-b border-gray-100 ${
         isSelected ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
       }`}
     >
-      <Avatar className="h-12 w-12">
+      <Avatar className="h-12 w-12 max-[1023px]:h-10 max-[1023px]:w-10">
         <AvatarImage src={avatarUrl} alt={fullName} />
-        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold max-[1023px]:text-sm">
           {initials}
         </AvatarFallback>
       </Avatar>
 
       <div className="flex flex-1 justify-between">
         <div className="flex flex-col items-start justify-between">
-          <h3 className="font-semibold text-gray-900 truncate">{fullName}</h3>
+          <h3 className="font-semibold max-[1023px]:text-sm text-gray-900 truncate">{fullName}</h3>
           <span
             className={`font-medium ${
               item.queueStatus === PatientQueueStatus.IN_EXERCISE
@@ -181,7 +181,7 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
                 onValueChange={(value) => handleStatusUpdate(value)}
                 disabled={updatingStatus}
               >
-                <SelectTrigger className={`text-xs ${getStatusColor(item.queueStatus)} border-0 flex justify-center min-w-[85px] h-auto p-1 [&>svg]:hidden focus:ring-0 focus:ring-offset-0`}>
+                <SelectTrigger className={`text-xs max-[1023px]:text-[10px] max-[870px]:text-[9px] ${getStatusColor(item.queueStatus)} border-0 flex justify-center min-w-[85px] max-[1023px]:min-w-[70px] max-[870px]:min-w-[60px] h-auto p-1 max-[1023px]:p-0.5 max-[870px]:p-0.5 [&>svg]:hidden focus:ring-0 focus:ring-offset-0`}>
                   <SelectValue>{getStatusText(item.queueStatus)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -195,26 +195,26 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
           </span>
         </div>
 
-        <div className="flex flex-col items-center justify-between text-sm">
-          <span className={`font-semibold ${getPendingAmountColor()}`}>
+        <div className="flex flex-col items-center justify-between text-sm max-[1023px]:text-xs">
+          <span className={`font-semibold max-[1023px]:font-medium ${getPendingAmountColor()}`}>
             {(() => {
 
               if (item.paidAmount >= item.totalAmount && item.totalAmount > 0) {
                 return (
-                  <span className="flex items-center gap-1">
-                    <span className="text-emerald-600">Full Paid</span>
+                  <span className="flex items-center gap-1 max-[1023px]:gap-0.5">
+                    <span className="text-emerald-600 max-[1023px]:text-xs">Full Paid</span>
                   </span>
                 );
               } else if (item.paidAmount > 0) {
                 return (
-                  <span className="flex items-center gap-1">
-                    <span className="text-gray-500">Pending</span>
+                  <span className="flex items-center gap-1 max-[1023px]:gap-0.5">
+                    <span className="text-gray-500 max-[1023px]:text-xs">Pending</span>
                   </span>
                 );
               } else {
                 return (
-                  <span className="flex items-center gap-1">
-                    <span className="text-red-600">Unpaid</span>
+                  <span className="flex items-center gap-1 max-[1023px]:gap-0.5">
+                    <span className="text-red-600 max-[1023px]:text-xs">Unpaid</span>
                   </span>
                 );
               }
@@ -222,11 +222,11 @@ export default function QueueCard({ item, isSelected, onClick, onStatusChange }:
           </span>
           <div>
             {isWalkIn ? (
-              <Badge variant="outline" className="text-xs border-gray-300 text-gray-600">
+              <Badge variant="outline" className="text-xs max-[1023px]:text-[10px] max-[870px]:text-[9px] max-[1023px]:px-1.5 max-[870px]:px-1 max-[1023px]:py-0.5 max-[870px]:py-0.5 border-gray-300 text-gray-600">
                 Walk-in
               </Badge>
             ):(
-              <Badge variant="outline" className="text-xs border-gray-300 text-gray-600">
+              <Badge variant="outline" className="text-xs max-[1023px]:text-[10px] max-[870px]:text-[9px] max-[1023px]:px-1.5 max-[870px]:px-1 max-[1023px]:py-0.5 max-[870px]:py-0.5 border-gray-300 text-gray-600">
                 Pre-Booked
               </Badge>
             )}

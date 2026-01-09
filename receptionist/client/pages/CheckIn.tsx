@@ -72,22 +72,24 @@ export default function CheckIn() {
         minHeight: '100vh',
     }}>
         <Navbar/>
-    <div style={{
+    <div 
+      className="mt-[30px] max-lg:mt-6"
+      style={{
       width: '100%',
       position: 'relative',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: '30px',
     }}>
-      <div style={{
+      <div 
+        className="gap-[18px] max-lg:gap-4"
+        style={{
         width: '100%',
         maxWidth: '449px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        gap: '18px',
       }}>
         {/* Back to Welcome Button */}
         <div 
@@ -124,29 +126,32 @@ export default function CheckIn() {
         </div>
 
         {/* Main Card */}
-        <div style={{
+        <div 
+          className="py-[80px] px-[52px] max-lg:py-16 max-lg:px-8"
+          style={{
           width: '100%',
-          padding: '80px 52px',
           display: 'flex',
           alignItems: 'center',
           borderRadius: '10px',
           border: '1px solid #E4E5EB',
           background: 'linear-gradient(135deg, #FAFAFC 0%, rgba(250, 250, 252, 0.7) 100%)',
         }}>
-          <div style={{
+          <div 
+            className="gap-[50px] max-lg:gap-12"
+            style={{
             width: '100%',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '50px',
           }}>
             {/* Header Section */}
-            <div style={{
+            <div 
+              className="gap-5 max-lg:gap-6"
+              style={{
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '20px',
             }}>
               <h1 style={{
                 color: '#1D5287',
@@ -173,12 +178,13 @@ export default function CheckIn() {
             </div>
 
             {/* Form Section */}
-            <div style={{
+            <div 
+              className="gap-[25px]"
+              style={{
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
-              gap: '25px',
             }}>
               {/* Mobile Number Input */}
               <div style={{
@@ -242,9 +248,10 @@ export default function CheckIn() {
               </div>
 
               {/* Tip Box */}
-              <div style={{
+              <div 
+                className="py-5 px-[15.5px] max-lg:py-4 max-lg:px-4"
+                style={{
                 width: '100%',
-                padding: '20px 15.5px',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -269,10 +276,10 @@ export default function CheckIn() {
               <button
                 onClick={handleContinue}
                 disabled={mobileNumber.length !== 10 || loading}
+                className="px-6 py-3.5"
                 style={{
                   width: '100%',
                   height: '51px',
-                  padding: '14px 116px',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',

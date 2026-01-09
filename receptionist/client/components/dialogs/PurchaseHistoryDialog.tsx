@@ -24,7 +24,7 @@ export default function PurchaseHistoryDialog({ open, onClose, customerId }: Pur
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-[1023px]:max-w-[672px]">
         <h2 className="text-2xl mb-4">Purchase <span className="font-bold text-[#1D5287]">History</span></h2>
         {loading ? (
           <div className="space-y-2">

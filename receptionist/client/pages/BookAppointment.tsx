@@ -564,32 +564,31 @@ function AppointmentsPageContent() {
   return (
     <div className="min-h-screen bg-[url('/bg-1.jpg')]  bg-no-repeat bg-[100%_center]">
     <Navbar/>
-    <div className=" flex flex-col justify-center items-center mt-[59px] max-w-[978px] py-[40.5px] px-[97px] mx-auto bg-[linear-gradient(to_bottom_right,#FAFAFC,#FAFAFCb3)]">
+    <div className=" flex flex-col justify-center items-center mt-[59px] max-lg:mt-6 max-w-[978px] max-lg:max-w-[95%] py-[40.5px] max-lg:py-[50px] px-[97px] max-lg:px-[24px] mx-auto bg-[linear-gradient(to_bottom_right,#FAFAFC,#FAFAFCb3)]">
       {loading? <BookAppointmentSkeleton/>:(
-      <div className=" max-w-[784px] w-full">
-      <h1 className="text-center text-[36px] leading-none mb-4">Book Your <span className="text-[#1D5287] font-bold">Appointment</span></h1>
-      <p className="text-center text-sm text-[#0D0D0D] mb-[6px]">Ready to meet with you</p>
+      <div className=" max-w-[784px] max-lg:max-w-full w-full">
+      <h1 className="text-center text-[36px] max-lg:text-[24px] leading-none mb-4 max-lg:mb-2">Book Your <span className="text-[#1D5287] font-bold">Appointment</span></h1>
+      <p className="text-center text-sm max-lg:text-xs text-[#0D0D0D] mb-[6px] max-lg:mb-2">Ready to meet with you</p>
       <div className="max-w-6xl w-full mx-auto">
-        <div className="w-full">
-          <h2 className="font-medium px-1">Select Staff</h2>
+        <div className="w-full max-lg:mb-3">
+          <h2 className="font-medium px-1 max-lg:text-sm">Select Staff</h2>
           <StaffSelect  value={staffId} onChange={setStaffId} />
         </div>
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 items-end">
-          <div className="md:col-span-1 flex flex-col gap-6">
+        <div className="mt-6 max-lg:mt-3 grid grid-cols-1 md:grid-cols-2 items-end">
+          <div className="md:col-span-1 flex flex-col gap-6 max-lg:gap-3">
             <Calendar value={date} onChange={d => { setDate(d); setSelectedSlot(null) }} />
           </div>
-          <div className="md:col-span-1 p-4 rounded pt-[18px] pl-[45px] pr-0 pb-0 max-h-[345px]">
-            <div className="mt-4">
+          <div className="md:col-span-1 p-4 max-lg:p-3 rounded pt-[18px] max-lg:pt-3 pl-[45px] max-lg:pl-3 pr-4 max-lg:pr-3 pb-0 max-h-[345px] max-lg:max-h-[280px] overflow-hidden w-full">
+            <div className="mt-4 max-lg:mt-2">
               <TimeSlots staffId={staffId} date={date} onSelect={handleSelectSlot} selectedSlotId={selectedSlot?.id} />
             </div>
             <button
               onClick={handleContinue}
               disabled={!selectedSlot || isSubmitting}
+              className="px-6 py-3.5 max-lg:px-4 max-lg:py-3 w-full max-w-full"
               style={{
                 marginTop: '12px',
-                width: '100%',
                 height: '51px',
-                padding: '14px 116px',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',

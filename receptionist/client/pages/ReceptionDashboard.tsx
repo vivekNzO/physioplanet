@@ -557,15 +557,15 @@ export default function ReceptionDashboard() {
       <Navbar />
     
       {/* Main Content */}
-      <div className="container mx-auto px-10 py-10">
+      <div className="container mx-auto px-10 max-lg:px-3 max-[870px]:px-2 py-10 max-lg:py-4 max-[870px]:py-3">
       {isInitialLoad ? (<QueuePageSkeleton/>):(
-      <div className="flex-1 flex overflow-hidden gap-[10px] items-stretch">
+      <div className="flex-1 flex overflow-hidden gap-[10px] max-[1302px]:gap-4 max-lg:gap-1.5 max-[870px]:gap-1 items-stretch">
         {/* Left Panel - Queue List */}
-        <div className="max-w-96 w-full border-r bg-white border-gray-200 flex flex-col shadow-sm min-h-0 max-h-[728px]">
+        <div className="max-w-96 max-[1302px]:max-w-[320px] max-lg:max-w-[260px] max-[870px]:max-w-[200px] max-md:max-w-[240px] w-full border-r bg-white border-gray-200 flex flex-col shadow-sm min-h-0 max-h-[728px] flex-shrink">
           {/* Queue Header */}
-          <div className="p-6 border-b border-gray-200 shrink-0">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl text-[#344256] font-normal">
+          <div className="p-6 max-lg:p-3 max-[870px]:p-2 max-md:p-2.5 border-b border-gray-200 shrink-0">
+            <div className="flex items-center justify-between mb-4 max-lg:mb-3 max-[870px]:mb-2">
+              <h2 className="text-2xl max-lg:text-lg max-[870px]:text-sm max-md:text-base text-[#344256] font-normal">
                 {isSearchMode ? (
                   <>Search <span className="text-[#1D5287] font-bold">Results</span></>
                 ) : (() => {
@@ -634,14 +634,14 @@ export default function ReceptionDashboard() {
               if (!isToday || isSearchMode) return null;
               
               return (
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
+                <div className="flex gap-2 max-lg:gap-1.5 max-[870px]:gap-1 w-full">
+                  <div className="relative w-1/2 flex-shrink-0">
                     <Input
                       type="text"
-                      placeholder="Search patient"
+                      placeholder="Search"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-4 pr-4"
+                      className="pl-4 pr-4 max-lg:text-sm max-[870px]:text-xs max-[870px]:px-2 w-full text-sm"
                     />
                     {searchLoading && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -649,11 +649,11 @@ export default function ReceptionDashboard() {
                       </div>
                     )}
                   </div>
-                  <Button className="bg-gradient-to-b from-[#0557A8] to-[#1BB7E9] text-white shrink-0"
+                  <Button className="bg-gradient-to-b from-[#0557A8] to-[#1BB7E9] text-white w-1/2 flex-shrink-0 max-lg:text-xs max-[870px]:text-[10px] max-lg:px-2 max-[870px]:px-1.5 max-lg:py-1.5 max-[870px]:py-1 text-xs px-3 py-2 flex items-center justify-center"
                   onClick={()=>setBookNewAppointmentOpen(true)}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Appointment
+                    <Plus className="h-3.5 w-3.5 max-lg:h-3 max-lg:w-3 mr-1.5 max-lg:mr-1 min-[1320px]:hidden flex-shrink-0" />
+                    <span className="truncate">New</span>
                   </Button>
                 </div>
               );
@@ -665,7 +665,7 @@ export default function ReceptionDashboard() {
             {loading && queueData.length === 0 && !searchLoading ? (
               // Show loading skeleton when refreshing
               <div className="p-4 space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
+                {Array.from({ length: 5 }).map((_, i) => (
                   <div
                     key={i}
                     className="p-4 border border-gray-200 rounded-lg animate-pulse"
@@ -718,7 +718,7 @@ export default function ReceptionDashboard() {
         </div>
 
         {/* Right Panel - Appointment Details */}
-        <div className={`flex-1 border border-gray-200 flex flex-col shadow-sm min-h-0 ${selectedItem ? 'bg-transparent' : 'bg-white'}`}>
+        <div className={`flex-1 min-w-0 border border-gray-200 flex flex-col shadow-sm min-h-0 ${selectedItem ? 'bg-transparent' : 'bg-white'}`}>
           {selectedItem ? (
             loadingAppointments && selectedItem.appointments.length === 0 ? (
               <AppointmentDetailsSkeleton />

@@ -389,16 +389,16 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
   return (
     <div className="flex flex-col max-h-[728px] w-full">
       {/* Header */}
-      <div className="border-b bg-white mb-[10px] border-gray-200 py-6 px-8 ">
-        <div className="mb-[21px]">
-            <div className="text-sm font-semibold text-[#1D5287]">Ticket No. <span className="ml-[7px] text-[16px] font-normal text-[#65758B]">{item.ticketNo}</span></div>
+      <div className="border-b bg-white mb-[10px] max-lg:mb-2 max-[870px]:mb-2 border-gray-200 py-6 max-lg:py-4 max-[870px]:py-3 px-8 max-lg:px-4 max-[870px]:px-3">
+        <div className="mb-[21px] max-lg:mb-3">
+            <div className="text-sm max-lg:text-xs max-[870px]:text-[10px] font-semibold text-[#1D5287]">Ticket No. <span className="ml-[7px] max-lg:ml-1 max-[870px]:ml-0.5 text-[16px] max-lg:text-sm max-[870px]:text-xs font-normal text-[#65758B]">{item.ticketNo}</span></div>
         </div>
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-[10px]">
+          <div className="flex items-center gap-[10px] max-lg:gap-2">
             <div className="relative">
-              <Avatar className="h-[60px] w-[60px]">
+              <Avatar className="h-[60px] w-[60px] max-lg:h-[50px] max-lg:w-[50px] max-[870px]:h-[45px] max-[870px]:w-[45px]">
                 <AvatarImage src={avatarUrl} alt={fullName} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl font-semibold">
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl max-lg:text-lg font-semibold">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -423,27 +423,27 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
               </label>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">{fullName}</h2>
-              <div className="flex items-center gap-3 mt-1">
+              <h2 className="text-lg max-lg:text-base max-[870px]:text-sm font-semibold text-gray-900">{fullName}</h2>
+              <div className="flex items-center gap-3 max-lg:gap-2 mt-1">
                 {item.customer.phone && (
-                  <div className="flex items-center gap-1 text-xs font-medium text-[#1D5287]">
-                    <Phone className="h-3 w-3" />
+                  <div className="flex items-center gap-1 text-xs max-lg:text-[10px] max-[870px]:text-[9px] font-medium text-[#1D5287]">
+                    <Phone className="h-3 w-3 max-lg:h-2.5 max-lg:w-2.5 max-[870px]:h-2 max-[870px]:w-2" />
                     <span>{item.customer.phone}</span>
                   </div>
                 )}
-                {item.customer.email && (
+                {/* {item.customer.email && (
                   <div className="flex items-center gap-1 text-sm text-gray-600">
                     <Mail className="h-4 w-4" />
                     <span>{item.customer.email}</span>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           </div>
 
         {/* Tab Buttons */}
 
-        <div className="flex gap-5">
+        <div className="flex max-[870px]:flex-col gap-5 max-lg:gap-3 max-[870px]:gap-2">
         {(() => {
           const appointment = item.appointments?.[0];
           if (!appointment) return null;
@@ -463,7 +463,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
           return (
             <Button 
               variant="outline" 
-              className="text-xs font-medium"
+              className="text-[10px] max-[870px]:text-[9px] font-medium py-1 px-2.5 max-[870px]:py-0.5 max-[870px]:px-2 h-auto"
               onClick={() => setManageWalkInDialogOpen(true)}
             >
               {buttonLabel}
@@ -472,14 +472,14 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
         })()}
           <Button 
             variant="outline" 
-            className="text-xs font-medium"
+            className="text-[10px] max-[870px]:text-[9px] font-medium py-1 px-2.5 max-[870px]:py-0.5 max-[870px]:px-2 h-auto"
             onClick={() => setGeneralInfoOpen(true)}
           >
             General Information
           </Button>
           <Button 
             variant="outline" 
-            className="text-xs font-medium"
+            className="text-[10px] max-[870px]:text-[9px] font-medium py-1 px-2.5 max-[870px]:py-0.5 max-[870px]:px-2 h-auto"
             onClick={() => setFeedbackOpen(true)}
           >
             Last Feedbacks
@@ -490,16 +490,16 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
       </div>
 
       {/* Content Area */}
-      <div className="flex w-full gap-[10px] max-h-[286px] mb-2.5 shrink-0">
+      <div className="flex w-full gap-[10px] max-[1123px]:gap-2 max-lg:gap-2 max-[870px]:gap-2 max-h-[286px] mb-2.5 max-lg:mb-2 max-[870px]:mb-2 shrink-0">
         {/* Prescriptions Photos Section */}
-        <div className="flex-1 basis-[40%]">
-          <Card className="border-gray-200 py-[21px] px-[15.5px] h-full">
-          <h3 className="text-[18px] font-normal mb-[25px]">
+        <div className="flex-1 basis-[40%] max-lg:basis-[38%]">
+          <Card className="border-gray-200 py-[21px] max-lg:py-4 max-[870px]:py-3 px-[15.5px] max-lg:px-3 max-[870px]:px-2.5 h-full">
+          <h3 className="text-[18px] max-lg:text-base max-[870px]:text-sm font-normal mb-[25px] max-lg:mb-4 max-[870px]:mb-3">
                 Prescription <span className="text-[#1D5287] font-bold">Photos</span>
             </h3>
             <CardContent className="p-0">
-              <div className="flex items-start gap-4 bg-white border border-dashed border-[#E5E5E5] rounded-lg p-[11px]">
-                <div className="flex flex-col items-center gap-2">
+              <div className="flex items-start gap-4 max-[1123px]:gap-2 max-lg:gap-2.5 max-[870px]:gap-2 bg-white border border-dashed border-[#E5E5E5] rounded-lg p-[11px] max-[1123px]:p-2 max-lg:p-2 max-[870px]:p-2 w-full overflow-hidden">
+                <div className="flex flex-col items-center gap-2 max-lg:gap-1.5 flex-shrink-0">
                   <input
                     type="file"
                     id="prescription-upload"
@@ -513,17 +513,17 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
                     <Button
                       type="button"
                       variant="ghost"
-                      className="flex items-center justify-center flex-col gap-[5px] h-auto px-[19.5px] py-[11.5px] bg-[#EEF7FB] hover:bg-blue-50 cursor-pointer rounded-lg"
+                      className="flex items-center justify-center flex-col gap-[5px] max-lg:gap-1 h-auto px-[19.5px] max-lg:px-3 py-[11.5px] max-lg:py-2 bg-[#EEF7FB] hover:bg-blue-50 cursor-pointer rounded-lg"
                       onClick={() => document.getElementById('prescription-upload')?.click()}
                     >
-                      <div className="w-12 h-12 rounded-full  flex items-center justify-center">
-                        <img src="/Mask group (6).png" className="h-[25px] w-[25px] text-white" />
+                      <div className="w-12 h-12 max-lg:w-10 max-lg:h-10 rounded-full flex items-center justify-center">
+                        <img src="/Mask group (6).png" className="h-[25px] max-lg:h-[20px] w-[25px] max-lg:w-[20px] text-white" />
                       </div>
-                      <span className="text-[10px] font-medium text-gray-700">Click Photo</span>
+                      <span className="text-[10px] max-lg:text-[9px] font-medium text-gray-700">Click Photo</span>
                     </Button>
                   </label>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 max-[1123px]:gap-2 max-lg:gap-2 flex-1 min-w-0 overflow-hidden">
                   {prescriptionPhotos.length > 0 ? (
                     <>
                       {[...prescriptionPhotos]
@@ -532,7 +532,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
                         .map((photo, idx) => (
                         <div
                           key={photo.id}
-                          className="relative w-[92px] h-[92px] bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex-shrink-0"
+                          className={`relative w-[92px] max-lg:w-[75px] h-[92px] max-lg:h-[75px] bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex-shrink-0 ${idx === 1 ? 'max-[1242px]:hidden' : ''}`}
                         >
                           <img
                             src={getFullPhotoUrl(photo.imageUrl)}
@@ -576,8 +576,8 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
                   )}
                 </div>
               </div>
-              <div className="bg-[#F0F9E8] border border-[#D4E7C5] rounded p-3 mt-4">
-                <p className="text-xs text-gray-700">
+              <div className="bg-[#F0F9E8] border border-[#D4E7C5] rounded p-3 max-[1123px]:p-2 max-lg:p-2 max-[870px]:p-1.5 mt-4 max-[1123px]:mt-2 max-lg:mt-3 max-[870px]:mt-2">
+                <p className="text-xs max-[1123px]:text-[10px] max-lg:text-[10px] max-[870px]:text-[9px] text-gray-700 leading-tight max-[1123px]:leading-snug">
                   <span className="font-semibold text-[#52813C]">Note:-</span> Always click a clean photo of your Prescription for better results.
                   {uploading && <span className="ml-2 text-blue-600">Uploading...</span>}
                 </p>
@@ -587,18 +587,18 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
         </div>
 
         {/* Plan Details Section */}
-        <div className="flex-1 basis-[30%]">
-          <Card className="border-gray-200 p-5 h-full flex flex-col">
-           <h3 className="text-[18px] font-normal mb-[25px]">
+        <div className="flex-1 basis-[30%] max-lg:basis-[31%]">
+          <Card className="border-gray-200 p-5 max-[1171px]:p-2.5 max-lg:p-3 max-[870px]:p-2.5 h-full flex flex-col">
+           <h3 className="text-[18px] max-lg:text-base max-[870px]:text-sm font-normal mb-[25px] max-[1171px]:mb-2 max-lg:mb-4 max-[870px]:mb-3">
                 Plan <span className="text-[#1D5287] font-bold">Details</span>
             </h3>
-            <CardContent className="p-0 bg-white flex flex-col justify-between flex-1">
-              <div className="mb-6">
-                <h4 className="text-xl font-medium mb-2">{recentPackage ? recentPackage.name : "No package purchased yet"}</h4>
+            <CardContent className="p-0 bg-white flex flex-col justify-end flex-1">
+              <div className="mb-6 max-lg:mb-4">
+                <h4 className="text-xl max-lg:text-base max-[870px]:text-sm font-medium">{recentPackage ? recentPackage.name : "No package purchased yet"}</h4>
               </div>
-              <div>
+              <div className="space-y-2">
               <Button
-                className="w-full text-xs bg-gradient-to-r from-[#75B640] to-[#52813C] text-white"
+                className="w-full text-xs max-[870px]:text-[10px] font-medium bg-gradient-to-r from-[#75B640] to-[#52813C] text-white max-[870px]:py-2"
                 onClick={() => setSellPlanDialogOpen(true)}
               >
                 Sell New Plan
@@ -621,7 +621,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
                   }
                 }}
               />
-              <Button variant="outline" className="w-full text-xs mt-2 font-medium" onClick={() => setPurchaseHistoryDialogOpen(true)}>
+              <Button variant="outline" className="w-full text-xs max-[870px]:text-[10px] font-medium max-[870px]:py-2" onClick={() => setPurchaseHistoryDialogOpen(true)}>
                   View Past Purchases
                 </Button>
                 <PurchaseHistoryDialog
@@ -635,35 +635,35 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
         </div>
 
         {/* Payment Summary Section */}
-        <div className="flex-1 basis-[30%]">
-          <Card className="border-gray-200 p-5 h-full flex flex-col">
-            <h3 className="text-[18px] font-normal mb-[25px]">
+        <div className="flex-1 basis-[30%] max-lg:basis-[31%]">
+          <Card className="border-gray-200 p-5 max-[1171px]:p-2.5 max-lg:p-3 max-[870px]:p-2.5 h-full flex flex-col">
+            <h3 className="text-[18px] max-lg:text-base max-[870px]:text-sm font-normal mb-[25px] max-[1171px]:mb-2 max-lg:mb-4 max-[870px]:mb-3">
                 Payment <span className="text-[#1D5287] font-bold">Summary</span>
             </h3>
-            <CardContent className="p-0 bg-white flex flex-col justify-between flex-1">
+            <CardContent className="p-0 bg-white flex flex-col justify-end flex-1">
               <div>
-                <div className="space-y-2 mb-6">
-                  <div className="flex justify-between items-center text-[18px] font-medium text-[#101111]">
-                    <span className={`font-semibold ${item.pendingAmount === 0 ? 'text-gray-500' : 'text-red-600'}`}>
+                <div className="space-y-2 mb-6 max-[1171px]:mb-3 max-lg:mb-4 max-[870px]:mb-3">
+                  <div className="text-[18px] max-[1171px]:text-base max-lg:text-sm max-[870px]:text-xs font-medium text-[#101111]">
+                    <span className={`font-semibold whitespace-nowrap ${item.pendingAmount === 0 ? 'text-gray-500' : 'text-red-600'}`}>
                       ₹{item.pendingAmount.toLocaleString()}.00 PENDING
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[18px] font-semibold">
-                    <span className="text-green-600 font-semibold">₹{item.paidAmount.toLocaleString()}.00 PAID</span>
+                  <div className="text-[18px] max-[1171px]:text-base max-lg:text-sm max-[870px]:text-xs font-semibold">
+                    <span className="text-green-600 font-semibold whitespace-nowrap">₹{item.paidAmount.toLocaleString()}.00 PAID</span>
                   </div>
 
                 </div>
               </div>
-              <div className="space-y-2 mt-4">
+              <div className="space-y-2">
                 <Button 
-                  className="w-full bg-gradient-to-r from-[#75B640] to-[#52813C] text-white text-xs font-medium"
+                  className="w-full text-xs max-[870px]:text-[10px] font-medium bg-gradient-to-r from-[#75B640] to-[#52813C] text-white max-[870px]:py-2"
                   onClick={() => {
                     setRecordPaymentDialogOpen(true);
                   }}
                 >
                   Record Payment
                 </Button>
-                <Button variant="outline" className="w-full text-xs font-medium" onClick={() => setPaymentHistoryDialogOpen(true)}>
+                <Button variant="outline" className="w-full text-xs max-[870px]:text-[10px] font-medium max-[870px]:py-2" onClick={() => setPaymentHistoryDialogOpen(true)}>
                   View Past Payment
                 </Button>
                 <PaymentHistoryDialog

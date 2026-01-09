@@ -19,7 +19,9 @@ export default function Index() {
       background: 'url("/bg-1.jpg") center/cover no-repeat fixed',
     }}>
       
-      <div style={{
+      <div 
+        className="gap-[50px] max-lg:gap-[35px]"
+        style={{
         position: 'relative',
         zIndex: 10,
         width: '100%',
@@ -27,7 +29,6 @@ export default function Index() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '50px',
       }}>
         <img 
           src="https://api.builder.io/api/v1/image/assets/TEMP/435986e1ad6235e7d271e91178b87b2f2a53f084?width=576" 
@@ -65,19 +66,20 @@ export default function Index() {
           </p>
         </div>
 
-        <div style={{
+        <div 
+          className="gap-[30px] max-lg:gap-[16px] max-lg:[grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]"
+          style={{
           width: '100%',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '30px',
         }}>
           <div
+            className="py-[34.5px] px-[29.5px] max-lg:py-4 max-lg:px-4"
             style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '34.5px 29.5px',
               gap: '15px',
               borderRadius: '4px',
               border: '1px solid #E4E5EB',
@@ -110,12 +112,12 @@ export default function Index() {
           </div>
 
           <div
+            className="py-[34.5px] px-[29.5px] max-lg:py-4 max-lg:px-4"
             style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '34.5px 29.5px',
               gap: '15px',
               borderRadius: '4px',
               border: '1px solid #E4E5EB',
@@ -137,12 +139,12 @@ export default function Index() {
           </div>
 
           <div
+            className="py-[34.5px] px-[29.5px] max-lg:py-4 max-lg:px-4"
             style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '34.5px 29.5px',
               gap: '15px',
               borderRadius: '4px',
               border: '1px solid #E4E5EB',
