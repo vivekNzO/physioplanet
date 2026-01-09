@@ -113,17 +113,9 @@ function LoginPage() {
         const roleName = result.user.role?.name?.toLowerCase()
         const isCustomer = result.user.isCustomer || roleName === 'customer'
         
-        // Debug logging
-        console.log('[LoginPage] Login result:', {
-          roleName,
-          isCustomer,
-          userRole: result.user.role,
-          fullUser: result.user
-        })
         
         if (isCustomer || roleName === 'customer') {
           // Customer login - go to welcome page
-          console.log('[LoginPage] Redirecting customer to welcome page')
           navigate('/welcome-page', {
             state: {
               mobileNumber: result.user.phone || phone,
@@ -132,12 +124,10 @@ function LoginPage() {
           })
         } else {
           // Non-customer (staff/admin) - go to check-in page
-          console.log('[LoginPage] Redirecting non-customer to check-in page')
           navigate('/')
         }
       } else {
         // Fallback to check-in page
-        console.log('[LoginPage] No user in result, redirecting to check-in page')
         navigate('/')
       }
     } catch (err: any) {
@@ -154,16 +144,21 @@ function LoginPage() {
 
   return (
     <div style={{
-      background: "url(/bg-1.jpg) 100% center no-repeat",
+      background: "url('/bg-2.jpg') center center / cover no-repeat",
       minHeight: '100vh',
     }}>
       <Navbar/>
+      <div style={{
+        maxWidth:'calc(100% - 612px)',
+        width:'100%',
+        margin:'0 auto',
+      }}>
       <div style={{
         width: '100%',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         marginTop: '100px',
       }}>
@@ -574,6 +569,7 @@ function LoginPage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   )
 }

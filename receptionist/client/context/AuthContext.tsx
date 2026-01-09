@@ -98,7 +98,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const roleName = userData.role?.name || 'Unknown';
         const isCustomer = userData.isCustomer || roleName === 'customer';
       } else {
-        console.log('[AuthContext] No user session found');
       }
       
       // If tenant ID is not set yet, try to get it from session or fetch by domain
@@ -237,14 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Console log for phone OTP login
         const roleName = userData.role?.name || 'Unknown';
         const isCustomer = userData.isCustomer || roleName === 'customer';
-        console.log('[AuthContext] Phone OTP login successful:', {
-          id: userData.id,
-          name: userData.name,
-          phone: userData.phone,
-          role: roleName,
-          isCustomer: isCustomer,
-          currentTenantId: userData.currentTenantId,
-        });
+
 
         return {
           user: userData,
@@ -285,7 +277,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Compute role from user for easier access
   const role = user?.role || null;
 
   return (

@@ -70,7 +70,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Phone, Mail, Plus, Camera } from "lucide-react";
 import { format } from "date-fns";
-import { utcToIst } from "@/utils/dateUtils";
+import { utcToIst, formatDateInIstMMDDYYYY } from "@/utils/dateUtils";
 import SellPlanDialog from "./dialogs/SellPlanDialog";
 import { useAuth } from "../context/AuthContext";
 import SellPlanDialog2 from "./dialogs/SellPlanDialog2";
@@ -212,6 +212,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
     // If status is CANCELLED (manually set), return it
     if (appointment.status === "CANCELLED") return "Cancelled";
     
+    // Otherwise, determine status based on startAt and endAt times
     const autoStatus = getStatusFromTimes(appointment.startAt, appointment.endAt);
     return autoStatus;
   };
@@ -298,7 +299,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
 
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col max-h-[728px] w-full">
       {/* Header */}
       <div className="border-b bg-white mb-[10px] border-gray-200 py-6 px-8 ">
         <div className="mb-[21px]">
@@ -380,7 +381,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
       </div>
 
       {/* Content Area */}
-      <div className="flex w-full gap-[10px] flex-1 max-h-[286px] mb-2.5">
+      <div className="flex w-full gap-[10px] max-h-[286px] mb-2.5 shrink-0">
         {/* Prescriptions Photos Section */}
         <div className="flex-1 basis-[40%]">
           <Card className="border-gray-200 py-[21px] px-[15.5px] h-full">
@@ -568,7 +569,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
       </div>
 
         {/* Visits Section with Tabs */}
-        <div className="mb-6">
+        <div>
           <Tabs defaultValue="future" className="w-full">
             <TabsList className="bg-blue-600 mb-4 p-0 h-auto rounded-lg overflow-hidden">
               <TabsTrigger 
@@ -583,16 +584,16 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
               >
                 Past Visits ({pastVisits.length})
               </TabsTrigger>
-              <TabsTrigger 
+              {/* <TabsTrigger 
                 value="planned"
                 className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:bg-white data-[state=inactive]:text-gray-700 rounded-none px-6 py-2.5 font-medium"
               >
                 Planned Treatments
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
 
-            <TabsContent value="future" className="mt-0">
-              <Card className="border-gray-200">
+            <TabsContent value="future" className="mt-0 h-full">
+              <Card className="border-0 shadow-none">
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <table className="w-full table-fixed">
@@ -654,7 +655,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
                                   )}
                                 </td>
                                 <td className="p-4 text-sm">{appointment.staff?.displayName || "N/A"}</td>
-                                <td className="p-4 text-sm">{appointment.startAt ? format(utcToIst(appointment.startAt), "MM/dd/yyyy") : "-"}</td>
+                                <td className="p-4 text-sm">{appointment.startAt ? formatDateInIstMMDDYYYY(appointment.startAt) : "-"}</td>
                                 <td className="p-4">
                                   <Badge className={getStatusBadgeColor(displayStatus)}>
                                     {displayStatus}
@@ -679,7 +680,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
             </TabsContent>
 
               <TabsContent value="past" className="mt-0">
-              <Card className="border-gray-200">
+              <Card className="border-0 shadow-none">
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <table className="w-full table-fixed">
@@ -739,7 +740,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
                                   )}
                                 </td>
                                 <td className="p-4 text-sm">{appointment.staff?.displayName || "N/A"}</td>
-                                <td className="p-4 text-sm">{appointment.startAt ? format(utcToIst(appointment.startAt), "MM/dd/yyyy") : "-"}</td>
+                                <td className="p-4 text-sm">{appointment.startAt ? formatDateInIstMMDDYYYY(appointment.startAt) : "-"}</td>
                                 <td className="p-4">
                                   <Badge className={getStatusBadgeColor(displayStatus)}>
                                     {displayStatus}
@@ -749,7 +750,7 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
                             );
                           })
                         ) : (
-                          <tr>
+                          <tr className="h-full">
                             <td colSpan={4} className="p-8 text-center text-gray-500">
                               No past visits found
                             </td>

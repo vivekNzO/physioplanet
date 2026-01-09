@@ -85,6 +85,18 @@ export default function SellPlanDialog({ open, onClose, onSelect, tenantId, cust
     standaloneServicesTotal;
   useEffect(() => { setCustomTotal(null); setIsEditingTotal(false); }, [showPayment]);
 
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setShowPayment(false);
+      setSelectedPackageIds([]);
+      setSelectedServiceIds([]);
+      setCustomTotal(null);
+      setIsEditingTotal(false);
+      setTab("packages");
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     setLoading(true);
@@ -208,6 +220,13 @@ export default function SellPlanDialog({ open, onClose, onSelect, tenantId, cust
 
         if (purchaseRes.data && purchaseRes.data.success) {
           toast.success(`Payment of ₹${amount} recorded successfully (${method})`);
+          // Reset all state before closing
+          setShowPayment(false);
+          setSelectedPackageIds([]);
+          setSelectedServiceIds([]);
+          setCustomTotal(null);
+          setIsEditingTotal(false);
+          setTab("packages");
           if (typeof onPurchaseComplete === 'function') onPurchaseComplete();
           if (typeof onClose === 'function') onClose();
         } else {
@@ -473,6 +492,23 @@ export default function SellPlanDialog({ open, onClose, onSelect, tenantId, cust
           showLineThrough={true}
           onPay={(amount, method, isPartial) => {
             handlePaymentNow(amount, method, !!isPartial);
+          }}
+          onRemovePackage={(packageId) => {
+            // Remove package and its services from selection
+            const pkg = packages.find(p => p.id === packageId);
+            if (pkg) {
+              // Remove package services from selection
+              const packageServiceIdsToRemove = (pkg.packageItems || []).map(item => item.id);
+              setSelectedServiceIds(prev => prev.filter(id => !packageServiceIdsToRemove.includes(id)));
+            }
+            setSelectedPackageIds(prev => prev.filter(id => id !== packageId));
+            // Reset custom total when removing items
+            setCustomTotal(null);
+          }}
+          onRemoveService={(serviceId) => {
+            setSelectedServiceIds(prev => prev.filter(id => id !== serviceId));
+            // Reset custom total when removing items
+            setCustomTotal(null);
           }}
         />
       )}

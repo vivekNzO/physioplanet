@@ -69,6 +69,21 @@ export function formatDateInIst(utcDate: Date | string | null | undefined): stri
 }
 
 /**
+ * Format a UTC date/string as IST date string (MM/dd/yyyy format)
+ */
+export function formatDateInIstMMDDYYYY(utcDate: Date | string | null | undefined): string {
+  if (!utcDate) return "-";
+  const date = typeof utcDate === 'string' ? new Date(utcDate) : utcDate;
+  if (isNaN(date.getTime())) return "-";
+  const istTime = date.getTime() + IST_OFFSET_MS;
+  const istDate = new Date(istTime);
+  const month = (istDate.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = istDate.getUTCDate().toString().padStart(2, '0');
+  const year = istDate.getUTCFullYear();
+  return `${month}/${day}/${year}`;
+}
+
+/**
  * Format a UTC date/string as IST datetime string (DD/MM/YYYY HH:mm format)
  */
 export function formatDateTimeInIst(utcDate: Date | string | null | undefined): string {

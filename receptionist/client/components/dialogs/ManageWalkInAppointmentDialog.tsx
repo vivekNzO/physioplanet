@@ -5,8 +5,10 @@ import StaffSelect from "@/components/StaffSelect";
 import TimeSlots, { Slot } from "@/components/TimeSlots";
 import axiosInstance from "@/lib/axios";
 import toast from "react-hot-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import Calendar from "@/components/Calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ManageWalkInAppointmentDialogProps {
   open: boolean;
@@ -32,22 +34,26 @@ export default function ManageWalkInAppointmentDialog({
   const [selectedStaffId, setSelectedStaffId] = useState<string | undefined>(appointment.staffId);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [date] = useState<Date>(new Date()); // Today's date
+  const [date, setDate] = useState<Date>(new Date()); // Selected date
   const [refreshKey, setRefreshKey] = useState(0); // Key to force TimeSlots refresh
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
   const [staffName, setStaffName] = useState<string | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const hasExistingSchedule = appointment.startAt && appointment.endAt;
-  const formattedStart = hasExistingSchedule ? format(new Date(appointment.startAt as string), "hh:mm a") : "";
-  const formattedEnd = hasExistingSchedule ? format(new Date(appointment.endAt as string), "hh:mm a") : "";
+  const appointmentStartDate = hasExistingSchedule ? new Date(appointment.startAt as string) : null;
+  const appointmentEndDate = hasExistingSchedule ? new Date(appointment.endAt as string) : null;
+  const formattedStart = hasExistingSchedule ? format(appointmentStartDate!, "hh:mm a") : "";
+  const formattedEnd = hasExistingSchedule ? format(appointmentEndDate!, "hh:mm a") : "";
+  const formattedDate = hasExistingSchedule ? format(appointmentStartDate!, "MMM dd, yyyy") : "";
 
-  // Reset selected slot when staff changes
+  // Reset selected slot when staff or date changes
   useEffect(() => {
     setSelectedSlot(null);
-    // Force refresh when staff changes
+    // Force refresh when staff or date changes
     if (selectedStaffId) {
       setRefreshKey(prev => prev + 1);
     }
-  }, [selectedStaffId]);
+  }, [selectedStaffId, date]);
 
   // Initialize with appointment's staff and reset refresh key when dialog opens or appointment changes
   useEffect(() => {
@@ -55,9 +61,16 @@ export default function ManageWalkInAppointmentDialog({
       if (appointment.staffId) {
         setSelectedStaffId(appointment.staffId);
       }
+      // Set date to today or appointment date if it exists
+      if (appointment.startAt) {
+        setDate(new Date(appointment.startAt));
+      } else {
+        setDate(new Date());
+      }
       // Force refresh of TimeSlots when dialog opens or appointment changes
       setRefreshKey(prev => prev + 1);
       setSelectedSlot(null);
+      setCalendarOpen(false);
     }
   }, [open, appointment.id, appointment.staffId, appointmentUpdateTimestamp]);
 
@@ -140,7 +153,7 @@ export default function ManageWalkInAppointmentDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
-            Manage Walk-in Appointment
+            Manage Appointment
           </DialogTitle>
         </DialogHeader>
 
@@ -156,25 +169,66 @@ export default function ManageWalkInAppointmentDialog({
                 <span className="font-semibold">{staffName}</span>
               </>
             )}
+            {formattedDate && (
+              <>
+                {" "}on{" "}
+                <span className="font-semibold">{formattedDate}</span>
+              </>
+            )}
           </div>
         )}
 
         <div className="space-y-6 mt-4">
-          {/* Staff Selection */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Select Staff Member</label>
-            <StaffSelect value={selectedStaffId} onChange={setSelectedStaffId} />
+          {/* Staff Selection and Date Selection - Side by Side */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Staff Selection */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Select Staff Member</label>
+              <StaffSelect value={selectedStaffId} onChange={setSelectedStaffId} />
+            </div>
+
+            {/* Date Selection */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Select Date</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 border rounded-lg px-4 py-2 bg-white flex items-center justify-between">
+                  <span className="text-sm text-gray-700">
+                    {format(date, "EEE, MMMM dd yyyy")}
+                  </span>
+                  <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <CalendarIcon className="h-5 w-5 text-gray-600" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        value={date}
+                        onChange={(selectedDate) => {
+                          setDate(selectedDate);
+                          setCalendarOpen(false);
+                          setSelectedSlot(null); // Reset selected slot when date changes
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Time Slots */}
           {selectedStaffId && (
             <div>
               <label className="block text-sm font-medium mb-2">
-                Available Time Slots for Today ({format(date, "MMM dd, yyyy")})
+                Available Time Slots for {format(date, "MMM dd, yyyy")}
               </label>
               <div className="border rounded-lg p-4 bg-gray-50">
                 <TimeSlots
-                  key={`${selectedStaffId}-${refreshKey}-${appointmentUpdateTimestamp || 0}`}
+                  key={`${selectedStaffId}-${date.toISOString()}-${refreshKey}-${appointmentUpdateTimestamp || 0}`}
                   staffId={selectedStaffId}
                   date={date}
                   onSelect={handleSlotSelect}

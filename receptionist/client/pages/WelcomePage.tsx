@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import axiosInstance from '@/lib/axios';
+import Navbar from '@/components/NavBar';
 
 function WelcomePage() {
   const navigate = useNavigate();
@@ -46,12 +47,9 @@ function WelcomePage() {
   return (
     <div style={{
       minHeight: '100vh',
-      width: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       background: 'url("/bg-2.jpg") center center / cover no-repeat',
     }}>
+      <Navbar/>
     <div style={{
         maxWidth:'calc(100% - 252px)',
         width:'100%',
@@ -64,6 +62,7 @@ function WelcomePage() {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: '18px',
+        marginTop: '60px',
       }}>
         {/* Main Card */}
         <div style={{
@@ -93,8 +92,9 @@ function WelcomePage() {
             <h1 className='text-[32px] text-center mb-[20px]' style={{lineHeight:"130%"}}>Welcome back,<br/><span className='font-bold text-[#1D5287]'>{fullName}</span></h1>
             <p className='text-center text-sm max-w-[420px]'>Welcome back, {fullName} - this is your personalized Physiotherapy Dashboard, designed to help you track your recovery, manage sessions, and stay motivated on your wellness journey.</p>
           </div>
+          <div className='w-full flex flex-col gap-4'>
               <button
-                // onClick={handleYesAppointment}
+                onClick={() => navigate('/check-in', { state: { flowType: 'appointment' } })}
                 style={{
                   width: '100%',
                   height: '51px',
@@ -116,9 +116,36 @@ function WelcomePage() {
                   fontWeight: 600,
                   textTransform: 'capitalize',
                 }}>
-                  START HERE
+                  Yes, I have an appointment
                 </span>
               </button>
+              <button
+                onClick={() => navigate('/check-in', { state: { flowType: 'walkin' } })}
+                style={{
+                  width: '100%',
+                  height: '51px',
+                  padding: '14px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: '4px',
+                  border: '1px solid #E9EAEB',
+                  background: '#FFF',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                }}>
+                <span style={{
+                  color: '#52813C',
+                  textAlign: 'center',
+                  fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  textTransform: 'capitalize',
+                }}>
+                  No, I am a walk-in
+                </span>
+              </button>
+          </div>
         </div>
         </div>
       </div>

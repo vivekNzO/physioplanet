@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 interface Package {
   id: string;
@@ -40,7 +40,9 @@ interface RecordPurchaseDialogProps {
   isEditingTotal?: boolean;
   onEditTotal?: (editing: boolean) => void;
   paying?: boolean;
-  showLineThrough?: boolean; 
+  showLineThrough?: boolean;
+  onRemovePackage?: (packageId: string) => void;
+  onRemoveService?: (serviceId: string) => void;
 }
 
 export default function RecordPurchaseDialog({ 
@@ -56,52 +58,94 @@ export default function RecordPurchaseDialog({
   isEditingTotal = false,
   onEditTotal,
   paying = false,
-  showLineThrough = false
+  showLineThrough = false,
+  onRemovePackage,
+  onRemoveService
 }: RecordPurchaseDialogProps) {
   const [amount, setAmount] = useState(defaultAmount);
   const [method, setMethod] = useState<'cash' | 'online'>('cash');
-  const [isPartialMode, setIsPartialMode] = useState(false);
-  const [partialAmount, setPartialAmount] = useState<number | null>(0);
-  const [isEditingPartial, setIsEditingPartial] = useState(false);
+  const [showPaymentInput, setShowPaymentInput] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => { 
     const total = customTotal !== null ? customTotal : totalCalculated;
     setAmount(total || defaultAmount);
-    // Reset partial state when dialog opens
+    // Reset payment input state when dialog opens
     if (open) {
-      setIsPartialMode(false);
-      setPartialAmount(0);
-      setIsEditingPartial(false);
+      setShowPaymentInput(false);
+      setPaymentAmount(null);
+      setIsEditingPayment(false);
+      setShowConfirmDialog(false);
     }
   }, [defaultAmount, customTotal, totalCalculated, open]);
+
+  // Close dialog and return to sell plan dialog when all items are removed
+  useEffect(() => {
+    if (open && selectedPackages.length === 0 && selectedServices.length === 0) {
+      onClose();
+    }
+  }, [selectedPackages.length, selectedServices.length, open, onClose]);
+
+  // Close confirmation dialog when main dialog closes
+  useEffect(() => {
+    if (!open) {
+      setShowConfirmDialog(false);
+    }
+  }, [open]);
 
   const displayTotal = customTotal !== null ? customTotal : totalCalculated;
 
   const totalToUse = displayTotal || defaultAmount;
 
-  const handleFullPayment = () => {
-    onPay(totalToUse, method, false);
+  const handlePayNow = () => {
+    // Show payment input field with default value as total
+    setShowPaymentInput(true);
+    setPaymentAmount(totalToUse);
+    setIsEditingPayment(false);
   };
 
-  const handlePartialPayment = () => {
-    const finalPartialAmount = partialAmount ?? 0;
+  const handlePay = () => {
+    const finalPaymentAmount = paymentAmount ?? totalToUse;
+    const isPartial = finalPaymentAmount < totalToUse;
 
     if (
-      !finalPartialAmount ||
-      Number.isNaN(finalPartialAmount) ||
-      finalPartialAmount <= 0 ||
-      finalPartialAmount > totalToUse
+      !finalPaymentAmount ||
+      Number.isNaN(finalPaymentAmount) ||
+      finalPaymentAmount <= 0 ||
+      finalPaymentAmount > totalToUse
     ) {
-      alert('Partial payment must be greater than 0 and not exceed the total amount.');
+      alert('Payment amount must be greater than 0 and not exceed the total amount.');
       return;
     }
 
-    onPay(finalPartialAmount, method, true);
+    // Show confirmation dialog
+    setShowConfirmDialog(true);
   };
 
+  const handleConfirmPayment = () => {
+    const finalPaymentAmount = paymentAmount ?? totalToUse;
+    const isPartial = finalPaymentAmount < totalToUse;
+    
+    // Close confirmation dialog immediately
+    setShowConfirmDialog(false);
+    
+    // Process payment - parent will handle closing the main dialog on success
+    onPay(finalPaymentAmount, method, isPartial);
+  };
+
+  const handleCancelConfirmation = () => {
+    // Just close confirmation dialog, stay on payment screen
+    setShowConfirmDialog(false);
+  };
+
+  const finalPaymentAmount = paymentAmount ?? totalToUse;
+
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-[801px] max-h-[90vh] overflow-y-auto px-[99px] pt-[29px] pb-[55px] rounded-lg">
+    <>
+      <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+        <DialogContent className="max-w-[801px] max-h-[90vh] overflow-y-auto px-[99px] pt-[29px] pb-[55px] rounded-lg">
         <h2 className="text-4xl text-center mb-6">
           Record <span className="text-[#1D5287] font-bold">Payments</span>
         </h2>
@@ -109,7 +153,16 @@ export default function RecordPurchaseDialog({
         <div className="space-y-4 mb-6">
           {/* Packages */}
           {selectedPackages.map(pkg => (
-            <div key={pkg.id} className="bg-[#E3F0D9] rounded-lg p-4 border border-[#ABD28C]">
+            <div key={pkg.id} className="bg-[#E3F0D9] rounded-lg p-4 border border-[#ABD28C] relative">
+              {onRemovePackage && (
+                <button
+                  onClick={() => onRemovePackage(pkg.id)}
+                  className="absolute top-[-5px] right-[-5px] w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                  disabled={paying}
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              )}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                   <div className="w-7 h-7 rounded-full bg-[#1D5287] flex items-center justify-center flex-shrink-0">
@@ -124,13 +177,22 @@ export default function RecordPurchaseDialog({
                   {pkg.packageItems.map(item => item.servicePrice?.service?.name).filter(Boolean).join(' / ')}
                 </div>
               )}
-              <div className="text-center text-xs font-medium mt-2">ONE TIME PAYMENT</div>
+              {/* <div className="text-center text-xs font-medium mt-2">ONE TIME PAYMENT</div> */}
             </div>
           ))}
           
           {/* Standalone selected services */}
           {selectedServices.map(item => (
-            <div key={item.id} className="bg-[#F0F4FA] rounded-lg p-4 flex items-center justify-between">
+            <div key={item.id} className="bg-[#F0F4FA] rounded-lg p-4 flex items-center justify-between relative">
+              {onRemoveService && (
+                <button
+                  onClick={() => onRemoveService(item.id)}
+                  className="absolute top-[-5px] right-[-5px] w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                  disabled={paying}
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              )}
               <div className="flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-[#1D5287] flex items-center justify-center flex-shrink-0">
                   <Check className="w-4 h-4 text-white" />
@@ -205,86 +267,124 @@ export default function RecordPurchaseDialog({
         </div>
 
         {/* Payment Actions */}
-        {!isPartialMode ? (
+        {!showPaymentInput ? (
           <div className="flex gap-3 mt-4">
+            <Button
+              variant="outline"
+              className="flex-1 border-gray-300 text-gray-700 font-semibold py-[18px] text-lg"
+              onClick={onClose}
+              disabled={paying}
+            >
+              <span className="text-base font-semibold">Back</span>
+            </Button>
             <Button 
               className="flex-1 bg-gradient-to-r from-[#75B640] to-[#52813C] text-white font-semibold py-[18px] text-lg" 
-              onClick={handleFullPayment}
+              onClick={handlePayNow}
               disabled={paying}
             >
               <span className="text-base font-semibold">
                 {paying ? 'Processing Payment...' : 'PAY NOW'}
               </span>
             </Button>
-            <Button
-              variant="outline"
-              className="flex-1 border-[#75B640] text-[#75B640] font-semibold py-[18px] text-lg"
-              onClick={() => {
-                setIsPartialMode(true);
-                setPartialAmount(0);
-              }}
-              disabled={paying}
-            >
-              <span className="text-base font-semibold">
-                {paying ? 'Processing Payment...' : 'PAY PARTIALLY'}
-              </span>
-            </Button>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between py-2 mt-[-20px]">
-              <span className="font-semibold text-lg">Partial Payment</span>
-              {isEditingPartial ? (
+              <span className="font-semibold text-lg">Record Payment</span>
+              {isEditingPayment ? (
                 <input
                   type="number"
                   min={0}
-                  max={displayTotal || defaultAmount}
+                  max={totalToUse}
                   className="text-xl font-bold border rounded px-2 py-1 w-32 focus:outline-none focus:ring"
-                  value={partialAmount !== null ? String(partialAmount).replace(/^0+/, '') : '0'}
+                  value={paymentAmount !== null ? String(paymentAmount).replace(/^0+/, '') : String(totalToUse).replace(/^0+/, '')}
                   onChange={e => {
                     const val = e.target.value.replace(/^0+/, '');
-                    setPartialAmount(val === '' ? 0 : Number(val));
+                    setPaymentAmount(val === '' ? 0 : Number(val));
                   }}
-                  onBlur={() => setIsEditingPartial(false)}
+                  onBlur={() => setIsEditingPayment(false)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') setIsEditingPartial(false);
+                    if (e.key === 'Enter') setIsEditingPayment(false);
                   }}
                   autoFocus
                 />
               ) : (
                 <span
                   className="text-xl font-bold cursor-pointer hover:underline"
-                  title="Click to edit partial payment"
-                  onClick={() => setIsEditingPartial(true)}
+                  title="Click to edit payment amount"
+                  onClick={() => setIsEditingPayment(true)}
                 >
-                  ₹{partialAmount ?? 0}/-
+                  ₹{paymentAmount ?? totalToUse}/-
                 </span>
               )}
             </div>
             <div className="flex gap-3 mt-4">
               <Button
                 variant="outline"
-                className="flex-1 border-gray-300 text-gray-700 font-semibold py-[14px] text-base uppercase"
+                className="flex-1 border-gray-300 text-gray-700 font-semibold py-[18px] text-lg"
                 onClick={() => {
-                  setIsPartialMode(false);
-                  setPartialAmount(0);
+                  setShowPaymentInput(false);
+                  setPaymentAmount(null);
                 }}
                 disabled={paying}
               >
-                Back
+                <span className="text-base font-semibold">Back</span>
               </Button>
               <Button
-                className="flex-1 uppercase bg-gradient-to-r from-[#75B640] to-[#52813C] text-white font-semibold py-[14px] text-base"
-                onClick={handlePartialPayment}
+                className="flex-1 bg-gradient-to-r from-[#75B640] to-[#52813C] text-white font-semibold py-[18px] text-lg"
+                onClick={handlePay}
                 disabled={paying}
               >
-                {paying ? 'Processing...' : 'Pay Partially'}
+                <span className="text-base font-semibold">
+                  {paying ? 'Processing...' : 'PAY'}
+                </span>
               </Button>
             </div>
           </>
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Confirmation Dialog */}
+    <Dialog 
+      open={showConfirmDialog && open} 
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setShowConfirmDialog(false);
+        }
+      }}
+    >
+      <DialogContent className="max-w-[500px] px-8 pt-8 pb-8 rounded-lg">
+        <h3 className="text-2xl font-semibold text-center mb-4">
+          Confirm Payment
+        </h3>
+        <p className="text-center text-gray-700 mb-6">
+          Are you sure you want to record a payment of{" "}
+          <span className="font-bold text-[#1D5287]">
+            ₹{finalPaymentAmount.toLocaleString('en-IN')}
+          </span>
+          ?
+        </p>
+        <div className="flex gap-3 mt-6">
+          <Button
+            variant="outline"
+            className="flex-1 border-gray-300 text-gray-700 font-semibold py-3"
+            onClick={handleCancelConfirmation}
+            disabled={paying}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="flex-1 bg-gradient-to-r from-[#75B640] to-[#52813C] text-white font-semibold py-3"
+            onClick={handleConfirmPayment}
+            disabled={paying}
+          >
+            {paying ? 'Processing...' : 'Yes, Confirm'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
