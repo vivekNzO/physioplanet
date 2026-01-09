@@ -275,6 +275,34 @@ export default function ReceptionDashboard() {
     }
   };
 
+  // Refresh customer data (e.g., after avatar update)
+  const refreshCustomerData = async (customerId: string) => {
+    try {
+      // Fetch updated customer data
+      const { data } = await axiosInstance.get(`/customers/${customerId}`);
+      
+      if (data?.data) {
+        const updatedCustomer = data.data;
+        
+        // Update queue data
+        setQueueData(prevQueue => 
+          prevQueue.map(item => 
+            item.customer.id === customerId 
+              ? { ...item, customer: updatedCustomer }
+              : item
+          )
+        );
+        
+        // Update selected item if it's the same customer
+        if (selectedItem && selectedItem.customer.id === customerId) {
+          setSelectedItem(prev => prev ? { ...prev, customer: updatedCustomer } : null);
+        }
+      }
+    } catch (error) {
+      console.error("Error refreshing customer data:", error);
+    }
+  };
+
   // Refresh payment summary for a specific customer
   const refreshCustomerPaymentSummary = async (customerId: string) => {
     try {
@@ -699,6 +727,7 @@ export default function ReceptionDashboard() {
                 item={selectedItem} 
                 onPaymentRecorded={() => refreshCustomerPaymentSummary(selectedItem.customer.id)}
                 onAppointmentUpdated={(appointmentId) => refreshCustomerAppointment(selectedItem.customer.id, appointmentId)}
+                onCustomerUpdated={() => refreshCustomerData(selectedItem.customer.id)}
               />
             )
           ) : (

@@ -98,7 +98,7 @@ function WelcomePage() {
           </div>
           <div className='w-full flex flex-col gap-4'>
               <button
-                // onClick={handleYesAppointment}
+                onClick={() => navigate('/check-in', { state: { flowType: 'appointment' } })}
                 style={{
                   width: '100%',
                   height: '51px',
@@ -124,7 +124,7 @@ function WelcomePage() {
                 </span>
               </button>
               <button
-                // onClick={handleYesAppointment}
+                onClick={() => navigate('/check-in', { state: { flowType: 'walkin' } })}
                 style={{
                   width: '100%',
                   height: '51px',
@@ -133,20 +133,20 @@ function WelcomePage() {
                   justifyContent: 'center',
                   alignItems: 'center',
                   borderRadius: '4px',
-                  border: '1px solid #74B540',
-                  background: 'transparent',
+                  border: '1px solid #E9EAEB',
+                  background: '#FFF',
                   cursor: 'pointer',
                   transition: 'all 0.3s ease',
                 }}>
                 <span style={{
-                  color: '#52813C',
+                  color: '#800000',
                   textAlign: 'center',
                   fontFamily: 'Poppins, -apple-system, Roboto, Helvetica, sans-serif',
                   fontSize: '16px',
                   fontWeight: 600,
                   textTransform: 'capitalize',
                 }}>
-                  No, I'm a walk-in
+                  No, I am a walk-in
                 </span>
               </button>
           </div>

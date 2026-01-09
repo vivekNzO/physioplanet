@@ -83,9 +83,10 @@ interface AppointmentDetailsPanelProps {
   item: QueueItem;
   onPaymentRecorded?: () => void;
   onAppointmentUpdated?: (appointmentId: string) => void;
+  onCustomerUpdated?: () => void;
 }
 
-export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onAppointmentUpdated }: AppointmentDetailsPanelProps) {
+export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onAppointmentUpdated, onCustomerUpdated }: AppointmentDetailsPanelProps) {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const { tenantId } = useAuth();
   const [generalInfoOpen, setGeneralInfoOpen] = useState(false);
@@ -106,6 +107,8 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
   const [isEditingTotal, setIsEditingTotal] = useState(false);
   const [paymentHistoryDialogOpen, setPaymentHistoryDialogOpen] = useState(false);
   const [manageWalkInDialogOpen, setManageWalkInDialogOpen] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [updatedAvatarUrl, setUpdatedAvatarUrl] = useState<string | null>(null);
 
   const fullName = `${item.customer.firstName || ""} ${item.customer.lastName || ""}`.trim() || "Unknown Patient";
   const initials = fullName
@@ -121,8 +124,8 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
     return `${apiBase}/api${photoUrl}`;
   };
 
-  // Get avatar URL - check photoUrl first, then fallback to metadata
-  const avatarUrl = getFullPhotoUrl(item.customer.photoUrl) || item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
+  // Get avatar URL - check updated URL first, then photoUrl, then fallback to metadata
+  const avatarUrl = updatedAvatarUrl || getFullPhotoUrl(item.customer.photoUrl) || item.customer.metadata?.avatar || item.customer.metadata?.profileImage;
 
   // Fetch prescriptions from backend - get ALL prescriptions for this customer
   useEffect(() => {
@@ -204,6 +207,91 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
       alert("Upload failed");
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Handle avatar photo upload
+  const handleAvatarPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("photo", file);
+    
+    // Only send fields that exist in Prisma Customer model and are updatable
+    // Valid Prisma Customer fields: id, tenantId, userId (relation), email, phone, firstName, lastName, 
+    // dateOfBirth, notes, metadata, photoUrl, createdAt, updatedAt, gender
+    // We only send updatable fields (not id, tenantId, createdAt, updatedAt, userId, metadata)
+    const customer = item.customer;
+    
+    // Required field
+    if (customer.firstName) {
+      formData.append("firstName", customer.firstName);
+    }
+    
+    // Optional fields - only send if they have values
+    if (customer.lastName && customer.lastName.trim()) {
+      formData.append("lastName", customer.lastName);
+    }
+    if (customer.email && customer.email.trim()) {
+      formData.append("email", customer.email);
+    }
+    if (customer.phone && customer.phone.trim()) {
+      formData.append("phone", customer.phone);
+    }
+    if (customer.gender && customer.gender.trim()) {
+      formData.append("gender", customer.gender);
+    }
+    if (customer.dateOfBirth) {
+      formData.append("dateOfBirth", customer.dateOfBirth);
+    }
+    if (customer.notes && customer.notes.trim()) {
+      formData.append("notes", customer.notes);
+    }
+    
+    // Explicitly do NOT send:
+    // - userId (it's a relation, not a direct field)
+    // - age, weight, bloodGroup, address, city, state, zipCode (don't exist in Prisma schema)
+    // - id, tenantId, createdAt, updatedAt, metadata (not updatable or handled separately)
+
+    setUploadingAvatar(true);
+    try {
+      const { data } = await axiosInstance.put(
+        `/customers/${item.customer.id}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (data?.success && data?.data) {
+        const updatedPhotoUrl = data.data.photoUrl;
+        if (updatedPhotoUrl) {
+          setUpdatedAvatarUrl(getFullPhotoUrl(updatedPhotoUrl));
+        }
+        toast.success('Profile photo updated successfully');
+        // Notify parent to refresh customer data
+        if (onCustomerUpdated) {
+          onCustomerUpdated();
+        }
+      } else {
+        toast.error('Failed to update profile photo');
+      }
+    } catch (err: any) {
+      console.error('Error uploading avatar:', err);
+      toast.error(err?.response?.data?.error || 'Failed to update profile photo');
+    } finally {
+      setUploadingAvatar(false);
+      // Reset file input
+      e.target.value = '';
     }
   };
 
@@ -307,12 +395,33 @@ export default function AppointmentDetailsPanel({ item, onPaymentRecorded, onApp
         </div>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-[10px]">
-            <Avatar className="h-[60px] w-[60px]">
-              <AvatarImage src={avatarUrl} alt={fullName} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl font-semibold">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="h-[60px] w-[60px]">
+                <AvatarImage src={avatarUrl} alt={fullName} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl font-semibold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <input
+                type="file"
+                id="avatar-upload"
+                className="hidden"
+                accept="image/*"
+                onChange={handleAvatarPhoto}
+                disabled={uploadingAvatar}
+              />
+              <label
+                htmlFor="avatar-upload"
+                className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-1.5 cursor-pointer shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Update profile photo"
+              >
+                {uploadingAvatar ? (
+                  <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+                ) : (
+                  <Camera className="h-3 w-3" />
+                )}
+              </label>
+            </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{fullName}</h2>
               <div className="flex items-center gap-3 mt-1">
